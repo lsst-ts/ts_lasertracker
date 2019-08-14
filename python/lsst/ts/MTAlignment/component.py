@@ -89,7 +89,7 @@ class AscComponent():
         await asyncio.sleep(2)
 
     async def measure_m1m3(self):
-        if self.wait_for_readyfirst_measurement:
+        if self.first_measurement:
             print("first measurement, waiting for tracker warmup")
             await asyncio.sleep(5)
             self.first_measurement = False
@@ -139,8 +139,11 @@ class AscComponent():
         n = 10 
         cam_aligned = False
         m2_aligned = False
+        await self.measure_m1m3()
+        print("Now is when we would be doing m1m3 fit to fiducials...")
+        await asyncio.sleep(5)
         while n > 0:
-            if cam_aligned == False:
+            if cam_aligned is False:
                 await self.measure_cam()
                 cam_offset = await self.query_cam()
                 if randrange(5) == 4:
@@ -156,9 +159,6 @@ class AscComponent():
             n -= 1
             asyncio.sleep(0.5)
 
-
-    
-    
 
     async def disconnect(self):
         self.writer.close()

@@ -41,7 +41,7 @@ class AscComponent():
         await asyncio.sleep(0.5)
 
     async def send_msg(self, msg):
-        print("waiting for ready")
+        print(f"waiting for ready before sending {msg}")
         await self.wait_for_ready()
         print("ready received")
 
@@ -50,8 +50,9 @@ class AscComponent():
         print(f"writing {msg}")
         self.writer.write(msg)
         await self. writer.drain()
-        # data = await self.reader.readuntil(separator=bytes("\n", 'ascii'))
-        data = await  self.reader.read(256)
+        print("done writing and finished writer.drain()")
+        data = await self.reader.readuntil(separator=bytes("\n", 'ascii'))
+        # data = await  self.reader.read(256)
         print(f'Received: {data.decode()!r}')
         return data.decode()
 

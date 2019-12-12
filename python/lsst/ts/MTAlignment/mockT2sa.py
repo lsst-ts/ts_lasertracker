@@ -9,7 +9,7 @@ class MockT2SA():
     def __init__(self):
         self.server = None
         self.response_dict = {"?STAT": "READY",
-                              "!CMDEXE:M1M3": b"ACK300"}
+                              "!CMDEXE:M1M3": "ACK300"}
 
     async def start(self, timeout=5):
         self.server = await asyncio.start_server(self.response_loop, host="172.17.0.2", port=50000)
@@ -29,6 +29,7 @@ class MockT2SA():
             line = line.decode()
             if not line:
                 writer.close()
+                print("no line")
                 return
             line = line.strip()
             print(f"read command: {line!r}")
@@ -39,3 +40,4 @@ class MockT2SA():
                 except Exception as e:
                     print(e)
             await writer.drain()
+        print("while loop over")

@@ -7,23 +7,35 @@ class MockT2SA():
     """
 
     def __init__(self):
-        self.response_dict = {}
-        asyncio.run(self.run_server())
+        self.server = None
+        self.response_dict = {"?STAT": "READY",
+                              "!CMDEXE:M1M3": b"ACK300"}
 
-    async def responder(reader, writer):
-        data = await reader.read(100)
-        msg = data.decode()
-        addr = writer.get_extra_info('peername')
-        print(f"Received {msg} from {addr}")
-        print(f"send: {msg}")
-        writer.write(data)
-        await writer.drain()
-        writer.close()
+    async def start(self, timeout=5):
+        self.server = await asyncio.start_server(self.response_loop, host="172.17.0.2", port=50000)
 
-    async def run_server(self):
-        server = await asyncio.start_server(self.responder, '127.0.0.1', 50000)
-        addr = server.sockets[0].getsockname()
-        print(f"serving on {addr}")
+    async def stop(self, timeout=5):
+        if self.server is None:
+            return
+        server = self.server
+        self.server = None
+        server.close()
+        await asyncio.wait_for(server.wait_closed(), timeout=5)
 
-        async with server:
-            await server.serve_forever()
+    async def response_loop(self, reader, writer):
+        print("Response Loop begins")
+        while True:
+            line = await reader.readline()
+            line = line.decode()
+            if not line:
+                writer.close()
+                return
+            line = line.strip()
+            print(f"read command: {line!r}")
+            if line:
+                try:
+                    response = self.response_dict[line] + "\r\n"
+                    writer.write(response.encode())
+                except Exception as e:
+                    print(e)
+            await writer.drain()

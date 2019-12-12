@@ -41,11 +41,13 @@ class AscComponent():
         await asyncio.sleep(0.5)
 
     async def send_msg(self, msg):
-
+        print("waiting for ready")
         await self.wait_for_ready()
+        print("ready received")
 
         if type(msg) == str:  # this may move
             msg = bytes(msg, 'ascii')
+        print(f"writing {msg}")
         self.writer.write(msg)
         await self. writer.drain()
         # data = await self.reader.readuntil(separator=bytes("\n", 'ascii'))

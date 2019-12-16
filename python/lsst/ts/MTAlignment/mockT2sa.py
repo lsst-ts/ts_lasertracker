@@ -21,9 +21,15 @@ class MockT2SA():
                               }
 
     async def start(self, timeout=5):
+        """
+        Start the server
+        """
         self.server = await asyncio.start_server(self.response_loop, host=self.ip, port=50000)
 
     async def stop(self, timeout=5):
+        """
+        Stop the server
+        """
         if self.server is None:
             return
         server = self.server
@@ -32,6 +38,11 @@ class MockT2SA():
         await asyncio.wait_for(server.wait_closed(), timeout=5)
 
     async def response_loop(self, reader, writer):
+        """
+        Listens for messages from the CSC and responds either with canned text or
+        by invoking a method from self.response_dict.
+        """
+
         print("Response Loop begins")
         while True:
             line = await reader.readline()
@@ -44,29 +55,40 @@ class MockT2SA():
             if line:
                 try:
                     response = self.response_dict[line]
+                    # some responses are just strings, others are coroutines
                     if isinstance(response, str):
                         response = response + "\r\n"
                     else:
+                        # coroutines get passed writer so they can send messages to the CSC.
                         response = await response(writer)
                     if response is not None:
                         writer.write(response.encode())
                 except Exception as e:
                     print(e)
             await writer.drain()
-        print("while loop over")
+        print("response loop ends")
 
     async def execute_measurement_plan(self, writer):
+        """
+        Acknowledges the request to measure, then pretends to measure.
+        """
+
         print("begin measuring")
         ack = "ACK300\r\n"
         writer.write(ack.encode())
         await writer.drain()
 
         self.measuring = True
-        await asyncio.sleep(randrange(5,15))
+        await asyncio.sleep(randrange(5, 15))
         self.measuring = False
         print("done measuring")
 
     async def status(self, writer):
+        """
+        While pretend measuring is happening, status should return "EMP"--
+        Executing Measurement Plan
+        """
+
         if self.measuring:
             return "EMP\r\n"
         else:

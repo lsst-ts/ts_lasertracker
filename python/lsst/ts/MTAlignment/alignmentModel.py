@@ -21,14 +21,40 @@ class TrackerStatus(IntEnum):
 class AlignmentModel():
 
     def __init__(self):
-        self.server_address = ('140.252.33.138', 50000)
+        self.server_address = ("172.17.0.3", 50000)
         self.connected = False
         self.reader = None
         self.writer = None
         self.first_measurement = True
 
+        self.trackerstatus = None
+
     async def connect(self):
         self.reader, self.writer = await asyncio.open_connection(*self.server_address)
+        self.connected = True
+        asyncio.create_task(self.status_loop())
+
+    async def status_loop(self):
+        """
+        pings T2SA for status every second, and updates internal state.
+        """
+        while self.connected:
+            stat = await self.status()
+            if stat == "READY":
+                self.trackerstatus = TrackerStatus.READY
+            elif stat == "2FACE":
+                self.trackerstatus = TrackerStatus.TWOFACE
+            elif stat == "ADM":
+                self.trackerstatus = TrackerStatus.ADM
+            elif stat == "DRIFT":
+                self.trackerstatus = TrackerStatus.DRIFT
+            elif stat == "EMP":
+                self.trackerstatus = TrackerStatus.EMP
+            elif stat == "ERR":
+                self.trackerstatus = TrackerStatus.ERR
+            await asyncio.sleep(1)
+
+
 
     async def wait_for_ready(self):
 
@@ -52,15 +78,12 @@ class AlignmentModel():
 
     async def send_msg(self, msg):
         msg = msg + "\r\n"
-        print(f"waiting for ready before sending {msg}")
-        await self.wait_for_ready()
         if type(msg) == str:  # this may move
             msg = bytes(msg, 'ascii')
         print(f"sending {msg}")
         self.writer.write(msg)
         await self. writer.drain()
         data = await self.reader.readuntil(separator=bytes("\n", 'ascii'))
-        # data = await  self.reader.read(256)
         print(f'Received: {data.decode()!r}')
         return data.decode()
 
@@ -90,6 +113,8 @@ class AlignmentModel():
             self.first_measurement = False
         print("measure m2")
         msg = "!CMDEXE:M2"
+        print(f"waiting for ready before sending {msg}")
+        await self.wait_for_ready()
         data = await self.send_msg(msg)
         return data
 
@@ -100,6 +125,8 @@ class AlignmentModel():
             self.first_measurement = False
         print("measure m1m3")
         msg = "!CMDEXE:M1M3"
+        print(f"waiting for ready before sending {msg}")
+        await self.wait_for_ready()
         data = await self.send_msg(msg)
         return data
 
@@ -110,6 +137,8 @@ class AlignmentModel():
             self.first_measurement = False
         print("measure cam")
         msg = "!CMDEXE:CAM"
+        print(f"waiting for ready before sending {msg}")
+        await self.wait_for_ready()
         data = await self.send_msg(msg)
         return data
 
@@ -148,6 +177,7 @@ class AlignmentModel():
 
     async def disconnect(self):
         self.writer.close()
+        self.connected = False
 
     def msgformat(self, st):
         '''

@@ -1,5 +1,6 @@
 import asyncio
 from random import randrange
+import logging
 
 
 class MockT2SA():
@@ -7,10 +8,12 @@ class MockT2SA():
     Emulates New River Kinematics's T2SA application.
     """
 
-    def __init__(self, ip="172.17.0.2"):
+    def __init__(self, ip="172.17.0.3"):
         self.server = None
         self.ip = ip
         self.measuring = False
+        self.log = logging.getLogger()
+        self.run_loop_flag = True
         self.response_dict = {"?STAT": self.status,
                               "!CMDEXE:M1M3": self.execute_measurement_plan,
                               "!CMDEXE:CAM": self.execute_measurement_plan,
@@ -36,6 +39,7 @@ class MockT2SA():
         self.server = None
         server.close()
         await asyncio.wait_for(server.wait_closed(), timeout=5)
+        self.run_loop_flag = False
 
     async def response_loop(self, reader, writer):
         """
@@ -43,10 +47,10 @@ class MockT2SA():
         by invoking a method from self.response_dict.
         """
 
-        print("Response Loop begins")
-        while True:
+        self.log.debug("Response Loop begins")
+        while self.run_loop_flag:
             line = await reader.readline()
-            print(f"Mock T2SA received line: {line}")
+            self.log.debug(f"Mock T2SA received line: {line}")
             line = line.decode()
             if not line:
                 writer.close()
@@ -64,16 +68,16 @@ class MockT2SA():
                     if response is not None:
                         writer.write(response.encode())
                 except Exception as e:
-                    print(e)
+                    self.log.debug(e)
             await writer.drain()
-        print("response loop ends")
+        self.log.debug("response loop ends")
 
     async def execute_measurement_plan(self, writer):
         """
         Acknowledges the request to measure, then pretends to measure.
         """
 
-        print("begin measuring")
+        self.log.debug("begin measuring")
         ack = "ACK300\r\n"
         writer.write(ack.encode())
         await writer.drain()
@@ -81,7 +85,7 @@ class MockT2SA():
         self.measuring = True
         await asyncio.sleep(randrange(5, 15))
         self.measuring = False
-        print("done measuring")
+        self.log.debug("done measuring")
 
     async def status(self, writer):
         """

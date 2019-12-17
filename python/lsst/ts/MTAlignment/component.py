@@ -41,15 +41,16 @@ class AscComponent():
         await asyncio.sleep(0.5)
 
     async def send_msg(self, msg):
-
+        msg = msg + "\r\n"
+        print(f"waiting for ready before sending {msg}")
         await self.wait_for_ready()
-
         if type(msg) == str:  # this may move
             msg = bytes(msg, 'ascii')
+        print(f"sending {msg}")
         self.writer.write(msg)
         await self. writer.drain()
-        # data = await self.reader.readuntil(separator=bytes("\n", 'ascii'))
-        data = await  self.reader.read(256)
+        data = await self.reader.readuntil(separator=bytes("\n", 'ascii'))
+        # data = await  self.reader.read(256)
         print(f'Received: {data.decode()!r}')
         return data.decode()
 
@@ -149,7 +150,7 @@ class AscComponent():
                 if randrange(5) == 4:
                     cam_aligned = True
                     print("cam aligned")
-            asyncio.sleep(0.5)
+            await asyncio.sleep(0.5)
             if m2_aligned == False:
                 await self.measure_m2()
                 m2_offset = await self.query_m2()
@@ -157,7 +158,7 @@ class AscComponent():
                     m2_aligned = True
                     print ("M2 aligned")
             n -= 1
-            asyncio.sleep(0.5)
+            await asyncio.sleep(0.5)
 
 
     async def disconnect(self):

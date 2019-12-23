@@ -1,6 +1,7 @@
 
 import asyncio
 from enum import IntEnum
+import logging
 
 
 class LaserStatus(IntEnum):
@@ -20,8 +21,10 @@ class TrackerStatus(IntEnum):
 
 class AlignmentModel():
 
-    def __init__(self):
-        self.server_address = ("172.17.0.3", 50000)
+    def __init__(self, host, port):
+        self.host = host
+        self.port = port
+        self.log = logging.getLogger()
         self.connected = False
         self.reader = None
         self.writer = None
@@ -32,7 +35,10 @@ class AlignmentModel():
         self.com_lock = asyncio.Lock()
 
     async def connect(self):
-        self.reader, self.writer = await asyncio.open_connection(*self.server_address)
+        """
+        Connect to the T2SA host
+        """
+        self.reader, self.writer = await asyncio.open_connection(self.host, self.port)
         self.connected = True
         asyncio.create_task(self.status_loop())
 
@@ -57,6 +63,9 @@ class AlignmentModel():
             await asyncio.sleep(1)
 
     async def wait_for_ready(self):
+        """
+        Checks if the tracker is doing something, if so, sleep until it's done.
+        """
         with self.com_lock:
             wait_states = ("EMP\r\n")
             msg = bytes("?STAT\r\n", 'ascii')
@@ -77,6 +86,9 @@ class AlignmentModel():
             await asyncio.sleep(0.5)
 
     async def send_msg(self, msg):
+        """
+        Formats and sends a message to T2SA.
+        """
         msg = msg + "\r\n"
         if type(msg) == str:  # this may move
             msg = bytes(msg, 'ascii')
@@ -89,6 +101,9 @@ class AlignmentModel():
             return data.decode()
 
     async def status(self):
+        """
+        query T2SA for status
+        """
         response = await self.send_msg("?STAT")
         return response
 
@@ -105,13 +120,16 @@ class AlignmentModel():
             self.laserstatus = LaserStatus.LASEROFF
         elif data == "LON":
             self.laserstatus = LaserStatus.LASERON
+        elif data[0:4] == "WARM":
+            self.laserstatus = LaserStatus.WARMING
+            # TODO do something with the warmup timer in data[:4]
 
     async def laser_on(self):
         """
         Turns the Tracker Laser on (for warmup purposes)
         """
 
-        msg = "!CMDTLON"
+        msg = "!LST:1"
         data = await self.send_msg(msg)
         return data
 
@@ -120,7 +138,7 @@ class AlignmentModel():
         Turns the Tracker Laser off
         """
 
-        msg = "!CMDTLOFF"
+        msg = "!LST:0"
         data = await self.send_msg(msg)
         return data
 

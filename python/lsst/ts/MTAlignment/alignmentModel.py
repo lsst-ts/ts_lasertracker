@@ -74,10 +74,10 @@ class AlignmentModel():
             data = await  self.reader.read(64)
             stat = data.decode()
             if stat == "INIT" or stat == "INIT\r\n":
-                print("waiting for init")
+                self.log.debug("waiting for init")
                 await asyncio.sleep(5)
             while stat in wait_states:
-                print("...")
+                self.log.debug("...")
                 await asyncio.sleep(0.3)
                 self.writer.write(msg)
                 await self. writer.drain()
@@ -92,12 +92,12 @@ class AlignmentModel():
         msg = msg + "\r\n"
         if type(msg) == str:  # this may move
             msg = bytes(msg, 'ascii')
-        print(f"sending {msg}")
+        self.log.debug(f"sending {msg}")
         with self.com_lock:
             self.writer.write(msg)
             await self. writer.drain()
             data = await self.reader.readuntil(separator=bytes("\n", 'ascii'))
-            print(f'Received: {data.decode()!r}')
+            self.log.debug(f'Received: {data.decode()!r}')
             return data.decode()
 
     async def status(self):
@@ -148,12 +148,12 @@ class AlignmentModel():
         """
 
         if self.first_measurement:
-            print("first measurement, waiting for tracker warmup")
+            self.log.debug("first measurement, waiting for tracker warmup")
             await asyncio.sleep(5)
             self.first_measurement = False
-        print("measure m2")
+        self.log.debug("measure m2")
         msg = "!CMDEXE:M2"
-        print(f"waiting for ready before sending {msg}")
+        self.log.debug(f"waiting for ready before sending {msg}")
         await self.wait_for_ready()
         data = await self.send_msg(msg)
         return data
@@ -164,12 +164,12 @@ class AlignmentModel():
         """
 
         if self.first_measurement:
-            print("first measurement, waiting for tracker warmup")
+            self.log.debug("first measurement, waiting for tracker warmup")
             await asyncio.sleep(5)
             self.first_measurement = False
-        print("measure m1m3")
+        self.log.debug("measure m1m3")
         msg = "!CMDEXE:M1M3"
-        print(f"waiting for ready before sending {msg}")
+        self.log.debug(f"waiting for ready before sending {msg}")
         await self.wait_for_ready()
         data = await self.send_msg(msg)
         return data
@@ -180,12 +180,12 @@ class AlignmentModel():
         """
 
         if self.first_measurement:
-            print("first measurement, waiting for tracker warmup")
+            self.log.debug("first measurement, waiting for tracker warmup")
             await asyncio.sleep(2)
             self.first_measurement = False
-        print("measure cam")
+        self.log.debug("measure cam")
         msg = "!CMDEXE:CAM"
-        print(f"waiting for ready before sending {msg}")
+        self.log.debug(f"waiting for ready before sending {msg}")
         await self.wait_for_ready()
         data = await self.send_msg(msg)
         return data
@@ -195,7 +195,7 @@ class AlignmentModel():
         Query M2 position after running the M2 MP
         """
 
-        print("query m2")
+        self.log.debug("query m2")
         msg = "?POS M2"
         data = await self.send_msg(msg)
         return data
@@ -205,7 +205,7 @@ class AlignmentModel():
         Query M1m3 position after running the MP
         """
 
-        print("query m1m3")
+        self.log.debug("query m1m3")
         msg = "?POS M1M3"
         data = await self.send_msg(msg)
         return data
@@ -215,7 +215,7 @@ class AlignmentModel():
         Query cam position after running the MP
         """
 
-        print("query cam")
+        self.log.debug("query cam")
         msg = "?POS CAM"
         data = await self.send_msg(msg)
         return data

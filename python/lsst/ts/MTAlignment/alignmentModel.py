@@ -30,8 +30,6 @@ class AlignmentModel():
         self.writer = None
         self.first_measurement = True
 
-        self.trackerstatus = None
-        self.laserstatus = None
         self.com_lock = asyncio.Lock()
 
     async def connect(self):
@@ -40,33 +38,12 @@ class AlignmentModel():
         """
         self.reader, self.writer = await asyncio.open_connection(self.host, self.port)
         self.connected = True
-        asyncio.create_task(self.status_loop())
-
-    async def status_loop(self):
-        """
-        pings T2SA for status every second, and updates internal state.
-        """
-        while self.connected:
-            stat = await self.status()
-            if stat == "READY":
-                self.trackerstatus = TrackerStatus.READY
-            elif stat == "2FACE":
-                self.trackerstatus = TrackerStatus.TWOFACE
-            elif stat == "ADM":
-                self.trackerstatus = TrackerStatus.ADM
-            elif stat == "DRIFT":
-                self.trackerstatus = TrackerStatus.DRIFT
-            elif stat == "EMP":
-                self.trackerstatus = TrackerStatus.EMP
-            elif stat == "ERR":
-                self.trackerstatus = TrackerStatus.ERR
-            await asyncio.sleep(1)
 
     async def wait_for_ready(self):
         """
         Checks if the tracker is doing something, if so, sleep until it's done.
         """
-        with self.com_lock:
+        async with self.com_lock:
             wait_states = ("EMP\r\n")
             msg = bytes("?STAT\r\n", 'ascii')
             self.writer.write(msg)
@@ -88,6 +65,11 @@ class AlignmentModel():
     async def send_msg(self, msg):
         """
         Formats and sends a message to T2SA.
+
+        Parameters
+        ----------
+        msg : `str`
+            String message to send to T2SA controller.
         """
         msg = msg + "\r\n"
         if type(msg) == str:  # this may move
@@ -100,7 +82,7 @@ class AlignmentModel():
             self.log.debug(f'Received: {data.decode()!r}')
             return data.decode()
 
-    async def status(self):
+    async def check_status(self):
         """
         query T2SA for status
         """
@@ -112,17 +94,8 @@ class AlignmentModel():
         Query tracker laser status, and update model state accordingly
         """
 
-        msg = self.msgformat("?LSTA")
-        data = await self.send_msg(msg)
-        if data == "LNC":
-            self.laserstatus = LaserStatus.LASERNOTCONNECTED
-        elif data == "LOFF":
-            self.laserstatus = LaserStatus.LASEROFF
-        elif data == "LON":
-            self.laserstatus = LaserStatus.LASERON
-        elif data[0:4] == "WARM":
-            self.laserstatus = LaserStatus.WARMING
-            # TODO do something with the warmup timer in data[:4]
+        data = await self.send_msg("?LSTA")
+        return data
 
     async def laser_on(self):
         """

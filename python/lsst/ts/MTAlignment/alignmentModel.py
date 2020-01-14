@@ -39,9 +39,15 @@ class AlignmentModel():
         self.reader, self.writer = await asyncio.open_connection(self.host, self.port)
         self.connected = True
 
+    async def disconnect(self):
+        self.writer.close()
+        self.connected = False
+
     async def wait_for_ready(self):
         """
-        Checks if the tracker is doing something, if so, sleep until it's done.
+        Checks to see if the tracker is executing a measurement plan.
+        If so, hold on to control until we start getting a ready signal
+        from the tracker. This is likely to be deprecated later.
         """
         async with self.com_lock:
             wait_states = ("EMP\r\n")
@@ -54,7 +60,6 @@ class AlignmentModel():
                 self.log.debug("waiting for init")
                 await asyncio.sleep(5)
             while stat in wait_states:
-                self.log.debug("...")
                 await asyncio.sleep(0.3)
                 self.writer.write(msg)
                 await self. writer.drain()
@@ -75,7 +80,7 @@ class AlignmentModel():
         if type(msg) == str:  # this may move
             msg = bytes(msg, 'ascii')
         self.log.debug(f"sending {msg}")
-        with self.com_lock:
+        async with self.com_lock:
             self.writer.write(msg)
             await self. writer.drain()
             data = await self.reader.readuntil(separator=bytes("\n", 'ascii'))
@@ -91,7 +96,7 @@ class AlignmentModel():
 
     async def laser_status(self):
         """
-        Query tracker laser status, and update model state accordingly
+        Query laser tracker's laser status, and update model state accordingly
         """
 
         data = await self.send_msg("?LSTA")
@@ -101,29 +106,20 @@ class AlignmentModel():
         """
         Turns the Tracker Laser on (for warmup purposes)
         """
-
-        msg = "!LST:1"
-        data = await self.send_msg(msg)
+        data = await self.send_msg("!LST:1")
         return data
 
     async def laser_off(self):
         """
         Turns the Tracker Laser off
         """
-
-        msg = "!LST:0"
-        data = await self.send_msg(msg)
+        data = await self.send_msg(msg"!LST:0")
         return data
 
     async def measure_m2(self):
         """
         Execute M2 measurement plan
         """
-
-        if self.first_measurement:
-            self.log.debug("first measurement, waiting for tracker warmup")
-            await asyncio.sleep(5)
-            self.first_measurement = False
         self.log.debug("measure m2")
         msg = "!CMDEXE:M2"
         self.log.debug(f"waiting for ready before sending {msg}")
@@ -135,11 +131,6 @@ class AlignmentModel():
         """
         Execute M1M3 measurement plan
         """
-
-        if self.first_measurement:
-            self.log.debug("first measurement, waiting for tracker warmup")
-            await asyncio.sleep(5)
-            self.first_measurement = False
         self.log.debug("measure m1m3")
         msg = "!CMDEXE:M1M3"
         self.log.debug(f"waiting for ready before sending {msg}")
@@ -229,14 +220,17 @@ class AlignmentModel():
         data = await self.send_msg(msg)
         return data
 
-    async def set_randomize_points(self, val):
+    async def set_randomize_points(self, randomize_points):
         """
         Measure the points in the SpatialAnalyzer database in a random order
 
-        val: Boolean
+        Parameters
+        ----------
+        randomize_points : Boolean
+            True to randomize point order
         """
 
-        if val:
+        if randomize_points:
             msg = "SET_RANDOMIZE_POINTS:1"
         else:
             msg = "SET_RANDOMIZE_POINTS:0"
@@ -247,7 +241,10 @@ class AlignmentModel():
         """
         Runs the 2 face check against a given point group
 
-        pointgroup: String
+        Parameters
+        ----------
+        pointgroup : `str`
+            Name of the point group to use for 2 face check.
         """
 
         msg = "!2FACE_CHECK:" + pointgroup
@@ -258,7 +255,10 @@ class AlignmentModel():
         """
         Measure drift relative to a nominal point group
 
-        pointgroup: string
+        Parameters
+        ----------
+        pointgroup : `str`
+            Name of the point group to use for 2 face check.
         """
 
         msg = "!MEAS_DRIFT:" + pointgroup
@@ -269,8 +269,12 @@ class AlignmentModel():
         """
         Point at target, lock on and start measuring target using measurement profile
 
-        pointgroup: String
-        target: String
+        Parameters
+        ----------
+        pointgroup : `str`
+            Name of the point group to use for 2 face check.
+        target : `str`
+            Name of the targe within pointgroup
         """
 
         msg = f"!MEAS_SINGLE_POINT:{pointgroup};{target}"
@@ -281,7 +285,10 @@ class AlignmentModel():
         """
         Not 100% clear what this one does. Just set the profile?
 
-        profile: String
+        Parameters
+        ----------
+        profile : `str`
+            Name of the profile, I guess
         """
 
         msg = "!SINGLE_POINT_MEAS_PROFILE:" + profile
@@ -292,7 +299,10 @@ class AlignmentModel():
         """
         Generate report
 
-        reportname: String
+        Parameters
+        ----------
+        reportname : `str`
+            Name of the report
         """
 
         msg = "!GEN_REPORT:" + reportname
@@ -303,7 +313,10 @@ class AlignmentModel():
         """
         default tolerance is 0.001 dec deg
 
-        tolerance: float (TODO find out what the range is)
+        Parameters
+        ----------
+        tolerance : `float`
+            (TODO find out what the range is)
         """
 
         msg = "!SET_2FACE_TOL:" + tolerance
@@ -335,7 +348,10 @@ class AlignmentModel():
         """
         Load template file
 
-        filepath: String
+        Parameters
+        ----------
+        filepath : `str`
+            filepath to template file
         """
 
         msg = "!LOAD_SA_TEMPLATE_FILE:" + filepath
@@ -346,7 +362,10 @@ class AlignmentModel():
         """
         Nominal pt grp to locate station to and provide data relative to.
 
-        pointgroup: String
+        Parameters
+        ----------
+        pointgroup : `str`
+            Name of SA Pointgroup to use as reference
 
         """
 
@@ -358,7 +377,10 @@ class AlignmentModel():
         """
         Make workingframe the working frame:
 
-        workingframe: string
+        Parameters
+        ----------
+        workingframe : `str`
+            frame to set as working frame
         """
 
         msg = "!SET_WORKING_FRAME:" + workingframe
@@ -378,20 +400,26 @@ class AlignmentModel():
         """
         Save a jobfile
 
-        filepath: String
+        Parameters
+        ----------
+        filepath : `str`
+            where to save the job file
         """
 
         msg = "!SAVE_SA_JOBFILE:" + filepath
         data = await self.send_msg(msg)
         return data
 
-    async def set_station_lock(self, val):
+    async def set_station_lock(self, station_locked):
         """
         Prevents SA from automatically jumping stations when it detects that the tracker has drifted.
 
-        val: Boolean
+        Parameters
+        ----------
+        locked : `Boolean`
+            whether the station locks
         """
-        if val:
+        if station_locked:
             msg = "!SET_STATION_LOCK:1"
         else:
             msg = "!SET_STATION_LOCK:0"
@@ -417,16 +445,21 @@ class AlignmentModel():
         data = await self.send_msg(msg)
         return data
 
-    async def publish_telescope_position(self, telalt, telaz, camrot):
+    async def set_telescope_position(self, telalt, telaz, camrot):
         """
         Command in which TCS informs T2SA of the telescope’s current
         position and camera rotation angle, to be used ahead of a
         measurement cmd.
         TODO: we need to add dome position to this for calscreen alignment
 
-        telalt: float
-        telaz: float
-        camrot: float
+        Parameters
+        ----------
+        telalt : `Float`
+            altitude of telescope
+        telaz : `Float`
+            azimuth of telescope
+        camrot : `Float`
+            camera rotation   
         """
 
         msg = f"PUBLISH_ALT_AZ_ROT:{telalt};{telaz};{camrot}"
@@ -438,7 +471,10 @@ class AlignmentModel():
         This is the number of times the tracker samples each point
         in order to get one (averaged) measurement
 
-        numsamples: int
+        Parameters
+        ----------
+        numsamples : `Int`
+            Number of samples
         """
 
         msg = f"SET_NUM_SAMPLES:{numsamples}"
@@ -450,7 +486,10 @@ class AlignmentModel():
         This is the number of times we repeat an auto-measurement
         of a point group
 
-        numiters: int
+        Parameters
+        ----------
+        numiters : `Int`
+            number of iterations
         """
 
         msg = f"SET_NUM_ITERATIONS:{numiters}"
@@ -461,20 +500,14 @@ class AlignmentModel():
         """
         Increment to measured point group index by idx
 
-        idx: int
+        Parameters
+        ----------
+        idx : `Int`
+            Index
         """
 
         msg = f"INC_MEAS_INDEX:{idx}"
         data = await self.send_msg(msg)
         return data
 
-    async def disconnect(self):
-        self.writer.close()
-        self.connected = False
 
-    def msgformat(self, st):
-        '''
-        takes a string, converts to bytes, and adds the end-of-line characters
-        '''
-        msg = bytes(st + "\r\n", 'ascii')
-        return msg

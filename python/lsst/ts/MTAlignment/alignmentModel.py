@@ -258,7 +258,7 @@ class AlignmentModel():
         Parameters
         ----------
         pointgroup : `str`
-            Name of the point group to use for 2 face check.
+            Name of the point group for drift check.
         """
 
         msg = "!MEAS_DRIFT:" + pointgroup
@@ -272,7 +272,7 @@ class AlignmentModel():
         Parameters
         ----------
         pointgroup : `str`
-            Name of the point group to use for 2 face check.
+            Name of the point group that contains the target point.
         target : `str`
             Name of the targe within pointgroup
         """

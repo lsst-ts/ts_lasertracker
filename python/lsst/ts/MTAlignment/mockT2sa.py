@@ -51,8 +51,8 @@ class MockT2SA():
 
     async def response_loop(self, reader, writer):
         """
-        Listens for messages from the CSC and responds either with canned text or
-        by invoking a method from self.response_dict.
+        Listens for messages from the CSC and responds either with canned
+        text or by invoking a method from self.response_dict.
         """
 
         self.log.debug("Response Loop begins")
@@ -71,7 +71,8 @@ class MockT2SA():
                     if isinstance(response, str):
                         response = response + "\r\n"
                     else:
-                        # coroutines get passed writer so they can send messages to the CSC.
+                        # coroutines get passed writer so they can send
+                        # messages to the CSC.
                         response = await response(writer)
                     if response is not None:
                         writer.write(response.encode())

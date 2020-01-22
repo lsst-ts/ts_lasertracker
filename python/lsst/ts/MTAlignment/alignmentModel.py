@@ -54,7 +54,7 @@ class AlignmentModel():
             msg = bytes("?STAT\r\n", 'ascii')
             self.writer.write(msg)
             await self. writer.drain()
-            data = await  self.reader.read(64)
+            data = await self.reader.read(64)
             stat = data.decode()
             if stat == "INIT" or stat == "INIT\r\n":
                 self.log.debug("waiting for init")
@@ -63,7 +63,7 @@ class AlignmentModel():
                 await asyncio.sleep(0.3)
                 self.writer.write(msg)
                 await self. writer.drain()
-                data = await  self.reader.read(64)
+                data = await self.reader.read(64)
                 stat = data.decode()
             await asyncio.sleep(0.5)
 
@@ -113,7 +113,7 @@ class AlignmentModel():
         """
         Turns the Tracker Laser off
         """
-        data = await self.send_msg(msg"!LST:0")
+        data = await self.send_msg("!LST:0")
         return data
 
     async def measure_m2(self):
@@ -267,7 +267,8 @@ class AlignmentModel():
 
     async def measure_single_point(self, pointgroup, target):
         """
-        Point at target, lock on and start measuring target using measurement profile
+        Point at target, lock on and start measuring target using measurement
+        profile
 
         Parameters
         ----------
@@ -327,6 +328,13 @@ class AlignmentModel():
         """
         rms_tol default 0.050 mm
         max_tol default 0.1 mm
+
+        Parameters
+        ----------
+        rms_tol : `float`
+            rms tolerance
+        max_tol : `float`
+            max tolerance
         """
 
         msg = f"!SET_DRIFT_TOL:{rms_tol};{max_tol}"
@@ -338,6 +346,13 @@ class AlignmentModel():
         rms_tol default 0.050 mm
         max_tol default 0.1 mm
         not actually sure how this one differs from the previous...
+
+        Parameters
+        ----------
+        rms_tol : `float`
+            rms tolerance
+        max_tol : `float`
+            max tolerance
         """
 
         msg = f"!SET_LS_TOL:{rms_tol};{max_tol}"
@@ -412,7 +427,8 @@ class AlignmentModel():
 
     async def set_station_lock(self, station_locked):
         """
-        Prevents SA from automatically jumping stations when it detects that the tracker has drifted.
+        Prevents SA from automatically jumping stations when it detects that
+        the tracker has drifted.
 
         Parameters
         ----------
@@ -454,12 +470,12 @@ class AlignmentModel():
 
         Parameters
         ----------
-        telalt : `Float`
+        telalt : `float`
             altitude of telescope
-        telaz : `Float`
+        telaz : `float`
             azimuth of telescope
-        camrot : `Float`
-            camera rotation   
+        camrot : `float`
+            camera rotation
         """
 
         msg = f"PUBLISH_ALT_AZ_ROT:{telalt};{telaz};{camrot}"
@@ -473,7 +489,7 @@ class AlignmentModel():
 
         Parameters
         ----------
-        numsamples : `Int`
+        numsamples : `int`
             Number of samples
         """
 
@@ -509,5 +525,3 @@ class AlignmentModel():
         msg = f"INC_MEAS_INDEX:{idx}"
         data = await self.send_msg(msg)
         return data
-
-

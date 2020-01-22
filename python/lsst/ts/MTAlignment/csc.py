@@ -1,4 +1,3 @@
-from lsst.ts import salobj
 import enum
 
 
@@ -8,9 +7,4 @@ class ASCDetailedState(enum.intEnum):
     FAULT = 3
     OFFLINE = 4
     STANDBY = 5
-
     MEASURING = 6
-
-
-class ASC(salobj.BaseCsc):
-    

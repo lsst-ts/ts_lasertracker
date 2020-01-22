@@ -1,3 +1,11 @@
 *.pyc
 *.sh
+*.html
+*.js
+*.xml
+*.png
+*.json
+*.css
+tests/.tests.*
+version.py
 

@@ -20,7 +20,15 @@ class MockT2SA():
                               "!CMDEXE:M2": self.execute_measurement_plan,
                               "?POS M1M3": "<m1m3_coordinates>",
                               "?POS CAM": "<cam_coordinates>",
-                              "?POS M2": "<m2_coordinates>"
+                              "?POS M2": "<m2_coordinates>",
+                              "?OFFSET M1M3": "<m1m3_offset>",
+                              "?OFFSET CAM": "<cam_offset>",
+                              "?OFFSET M2": "<m2_offset>",
+                              "?LSTA": "LON",
+                              "!LST:0": "ACK300",
+                              "!LST:1": "ACK300",
+                              "SET_RANDOMIZE_POINTS:1": "ACK300",
+                              "SET_RANDOMIZE_POINTS:0": "ACK300"
                               }
 
     async def start(self, timeout=5):
@@ -43,8 +51,8 @@ class MockT2SA():
 
     async def response_loop(self, reader, writer):
         """
-        Listens for messages from the CSC and responds either with canned text or
-        by invoking a method from self.response_dict.
+        Listens for messages from the CSC and responds either with canned
+        text or by invoking a method from self.response_dict.
         """
 
         self.log.debug("Response Loop begins")
@@ -63,7 +71,8 @@ class MockT2SA():
                     if isinstance(response, str):
                         response = response + "\r\n"
                     else:
-                        # coroutines get passed writer so they can send messages to the CSC.
+                        # coroutines get passed writer so they can send
+                        # messages to the CSC.
                         response = await response(writer)
                     if response is not None:
                         writer.write(response.encode())

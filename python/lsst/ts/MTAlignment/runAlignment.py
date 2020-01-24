@@ -1,6 +1,7 @@
 import asyncio
 from component import AscComponent
 
+
 def testComponent():
     c = AscComponent()
 

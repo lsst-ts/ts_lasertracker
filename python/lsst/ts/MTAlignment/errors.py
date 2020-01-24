@@ -1,5 +1,6 @@
 from enum import IntEnum
 
+
 class T2SAErrors(IntEnum):
     NoError = 200
     CommandRejected = 300

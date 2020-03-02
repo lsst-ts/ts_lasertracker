@@ -1,4 +1,3 @@
-
 import asyncio
 from enum import IntEnum
 import logging
@@ -94,6 +93,18 @@ class AlignmentModel():
         response = await self.send_msg("?STAT")
         return response
 
+    async def send_string(self, message):
+        """
+        sends a string
+
+        Parameters
+        ----------
+        message : `str`
+            characters to send to T2SA.
+        """
+        response = await self.send_msg(message)
+        return response
+
     async def laser_status(self):
         """
         Query laser tracker's laser status, and update model state accordingly
@@ -157,6 +168,7 @@ class AlignmentModel():
     async def query_m2_position(self):
         """
         Query M2 position after running the M2 MP
+        Position queries are always in terms of M1M3 coordinate frame
         """
 
         self.log.debug("query m2")
@@ -167,6 +179,7 @@ class AlignmentModel():
     async def query_m1m3_position(self):
         """
         Query M1m3 position after running the MP
+        Position queries are always in terms of M1M3 coordinate frame
         """
 
         self.log.debug("query m1m3")
@@ -177,6 +190,7 @@ class AlignmentModel():
     async def query_cam_position(self):
         """
         Query cam position after running the MP
+        Position queries are always in terms of M1M3 coordinate frame
         """
 
         self.log.debug("query cam")
@@ -265,7 +279,7 @@ class AlignmentModel():
         data = await self.send_msg(msg)
         return data
 
-    async def measure_single_point(self, pointgroup, target):
+    async def measure_single_point(self, collection, pointgroup, target):
         """
         Point at target, lock on and start measuring target using measurement
         profile
@@ -278,7 +292,7 @@ class AlignmentModel():
             Name of the targe within pointgroup
         """
 
-        msg = f"!MEAS_SINGLE_POINT:{pointgroup};{target}"
+        msg = f"!MEAS_SINGLE_POINT:{collection};{pointgroup};{target}"
         data = await self.send_msg(msg)
         return data
 
@@ -343,8 +357,7 @@ class AlignmentModel():
 
     async def set_ls_tolerance(self, rms_tol, max_tol):
         """
-        rms_tol default 0.050 mm
-        max_tol default 0.1 mm
+        
         not actually sure how this one differs from the previous...
 
         Parameters
@@ -369,7 +382,7 @@ class AlignmentModel():
             filepath to template file
         """
 
-        msg = "!LOAD_SA_TEMPLATE_FILE:" + filepath
+        msg = "!LOAD_SA_TEMPLATE_FILE;" + filepath
         data = await self.send_msg(msg)
         return data
 
@@ -421,7 +434,7 @@ class AlignmentModel():
             where to save the job file
         """
 
-        msg = "!SAVE_SA_JOBFILE:" + filepath
+        msg = "!SAVE_SA_JOBFILE;" + filepath
         data = await self.send_msg(msg)
         return data
 

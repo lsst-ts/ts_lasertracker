@@ -198,30 +198,45 @@ class AlignmentModel():
         data = await self.send_msg(msg)
         return data
 
-    async def query_m2_offset(self):
+    async def query_m2_offset(self, refPtGrp="M1M3"):
         """
         Query M2 offset from nominal
+
+        Parameters
+        ----------
+        refPtGrp : String
+            name of pointgroup that will be used as the frame of reference for the offset.
         """
 
-        msg = "?OFFSET M2"
+        msg = "?OFFSET:" + refPtGrp +  ";M2"
         data = await self.send_msg(msg)
         return data
 
-    async def query_m1m3_offset(self):
+    async def query_m1m3_offset(self, refPtGrp="M1M3"):
         """
         Query M1m3 offset from nominal
+        
+        Parameters
+        ----------
+        refPtGrp : String
+            name of pointgroup that will be used as the frame of reference for the offset.
         """
 
-        msg = "?OFFSET M1M3"
+        msg = "?OFFSET:" + refPtGrp + ";M1M3"
         data = await self.send_msg(msg)
         return data
 
-    async def query_cam_offset(self):
+    async def query_cam_offset(self, refPtGrp="M1M3"):
         """
         Query cam offset from nominal + current rotation
+
+        Parameters
+        ----------
+        refPtGrp : String
+            name of pointgroup that will be used as the frame of reference for the offset.
         """
 
-        msg = "?OFFSET CAM"
+        msg = "?OFFSET:" + refPtGrp + ";CAM"
         data = await self.send_msg(msg)
         return data
 
@@ -248,6 +263,24 @@ class AlignmentModel():
             msg = "SET_RANDOMIZE_POINTS:1"
         else:
             msg = "SET_RANDOMIZE_POINTS:0"
+        data = await self.send_msg(msg)
+        return data
+
+    async def set_power_lock(self, power_lock):
+        """
+        enable/disable the Tracker's IR camera which helps it find SMRs, but 
+        can also cause it to lock on to thee wrong one sometimes.
+
+        Parameters
+        ----------
+        power_lock : Boolean
+            True to enable the IR camera assist
+        """
+
+        if power_lock:
+            msg = "SET_POWER_LOCK:1"
+        else:
+            msg = "SET_POWER_LOCK:0"
         data = await self.send_msg(msg)
         return data
 

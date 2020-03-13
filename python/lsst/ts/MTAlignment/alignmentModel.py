@@ -198,6 +198,23 @@ class AlignmentModel():
         data = await self.send_msg(msg)
         return data
 
+    async def query_point_position(self, pointgroup, point, collection="A"):
+        """
+        Query position of a previously measured point
+
+        Parameters
+        ----------
+        pointgroup : String
+            Name of pointgroup the point is in
+        point : String
+            Name of point
+        collection : String
+            name of collection the point is in. Default "A"
+        """
+        msg = f"?POINT_POS:{collection};{pointgroup};{point}"
+        data = await self.send_msg(msg)
+        return data
+
     async def query_m2_offset(self, refPtGrp="M1M3"):
         """
         Query M2 offset from nominal
@@ -208,7 +225,7 @@ class AlignmentModel():
             name of pointgroup that will be used as the frame of reference for the offset.
         """
 
-        msg = "?OFFSET:" + refPtGrp +  ";M2"
+        msg = "?OFFSET:" + refPtGrp + ";M2"
         data = await self.send_msg(msg)
         return data
 
@@ -237,6 +254,29 @@ class AlignmentModel():
         """
 
         msg = "?OFFSET:" + refPtGrp + ";CAM"
+        data = await self.send_msg(msg)
+        return data
+
+    async def query_point_delta(self, p1group, p1, p2group, p2, p1collection="A", p2collection="A"):
+        """
+        Query delta between two points
+
+        Parameters
+        ----------
+        p1group : String
+            Name of pointgroup the point 1 is in
+        p1 : String
+            Name of point 1
+        p1collection : String
+            name of collection point 1 is in. Default "A"
+        p2group : String
+            Name of pointgroup the point 2 is in
+        p2 : String
+            Name of point 2
+        p2collection : String
+            name of collection point 2 is in. Default "A"
+        """
+        msg = f"?POINT_DELTA:{p1collection};{p1group};{p1};{p2collection};{p2group};{p2}"
         data = await self.send_msg(msg)
         return data
 
@@ -331,12 +371,12 @@ class AlignmentModel():
 
     async def single_point_measurement_profile(self, profile):
         """
-        Not 100% clear what this one does. Just set the profile?
+        Sets a measurement profile in SA. 
 
         Parameters
         ----------
         profile : `str`
-            Name of the profile, I guess
+            Name of the profile.
         """
 
         msg = "!SINGLE_POINT_MEAS_PROFILE:" + profile
@@ -437,6 +477,7 @@ class AlignmentModel():
     async def set_working_frame(self, workingframe):
         """
         Make workingframe the working frame:
+        This is the frame whose coordinate system all coordinates will be provided relative to
 
         Parameters
         ----------
@@ -569,5 +610,31 @@ class AlignmentModel():
         """
 
         msg = f"INC_MEAS_INDEX:{idx}"
+        data = await self.send_msg(msg)
+        return data
+
+    async def save_settings(self):
+        """
+        Saves any setting changes immediately. Without calling this, setting
+        changes will be applied immediately but will not persist if T2SA
+        quits unexpectedly
+
+        """
+
+        msg = "!SAVE_SETTINGS"
+        data = await self.send_msg(msg)
+        return data
+
+    async def load_tracker_compensation(self, compfile):
+        """
+        Loads a tracker compensation file
+
+        Parameters
+        ----------
+        compfile : `String`
+            name and  filepath to compensation profile file
+        """
+
+        msg = "!LOAD_TRACKER_COMPENSATION:" + compfile
         data = await self.send_msg(msg)
         return data

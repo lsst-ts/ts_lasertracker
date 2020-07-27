@@ -8,7 +8,7 @@ class MockT2SA():
     Emulates New River Kinematics's T2SA application.
     """
 
-    def __init__(self, ip="172.17.0.3"):
+    def __init__(self, ip="127.0.0.1"):
         self.server = None
         self.ip = ip
         self.measuring = False

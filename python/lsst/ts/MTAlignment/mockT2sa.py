@@ -92,7 +92,7 @@ class MockT2SA():
         await writer.drain()
 
         self.measuring = True
-        await asyncio.sleep(randrange(5, 15))
+        await asyncio.sleep(2)
         self.measuring = False
         self.log.debug("done measuring")
 

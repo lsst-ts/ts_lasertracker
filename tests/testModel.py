@@ -41,8 +41,10 @@ class AlignmentMockTestCases(asynctest.TestCase):
         await self.model.connect()
         response = await self.model.send_msg("!CMDEXE:M1M3")
         assert response == "ACK300\r\n"  # mock acknkowleges command
+        # response2 = await self.model.check_status()
+        assert self.mock_t2sa.measuring
         response2 = await self.model.check_status()
-        assert response2 == "EMP\r\n" #  we should get an EMP response
+        assert response2 == "EMP\r\n"
         asyncio.sleep(3)
         response3 = await self.model.check_status()
         assert response3 == "READY\r\n" #  after waiting for measurement to execute, we should now get a READY response.

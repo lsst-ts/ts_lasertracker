@@ -87,11 +87,10 @@ class MockT2SA():
         """
 
         self.log.debug("begin measuring")
+        self.measuring = True
         ack = "ACK300\r\n"
         writer.write(ack.encode())
         await writer.drain()
-
-        self.measuring = True
         await asyncio.sleep(2)
         self.measuring = False
         self.log.debug("done measuring")

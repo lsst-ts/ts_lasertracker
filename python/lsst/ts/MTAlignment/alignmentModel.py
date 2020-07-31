@@ -89,6 +89,13 @@ class AlignmentModel():
     async def check_status(self):
         """
         query T2SA for status
+        Returns
+        -------
+        READY if tracker is ready
+        2FACE if executing two-face check
+        DRIFT if executing drift check
+        EMP if executing measurement plan
+        ERR-xxx if there is an error with error code xxx
         """
         response = await self.send_msg("?STAT")
         return response
@@ -108,6 +115,11 @@ class AlignmentModel():
     async def laser_status(self):
         """
         Query laser tracker's laser status, and update model state accordingly
+        Returns
+        -------
+        LON if laser is on
+        LOFF if laser is off
+        ERR-xxx if there is an error with error code xxx
         """
 
         data = await self.send_msg("?LSTA")
@@ -116,6 +128,10 @@ class AlignmentModel():
     async def laser_on(self):
         """
         Turns the Tracker Laser on (for warmup purposes)
+        
+        Returns
+        -------
+        ACK300 or ERR code
         """
         data = await self.send_msg("!LST:1")
         return data
@@ -123,6 +139,10 @@ class AlignmentModel():
     async def laser_off(self):
         """
         Turns the Tracker Laser off
+
+        Returns
+        -------
+        ACK300 or ERR code
         """
         data = await self.send_msg("!LST:0")
         return data
@@ -130,6 +150,10 @@ class AlignmentModel():
     async def measure_m2(self):
         """
         Execute M2 measurement plan
+        
+        Returns
+        -------
+        ACK300 or ERR code
         """
         self.log.debug("measure m2")
         msg = "!CMDEXE:M2"
@@ -141,6 +165,10 @@ class AlignmentModel():
     async def measure_m1m3(self):
         """
         Execute M1M3 measurement plan
+        
+        Returns
+        -------
+        ACK300 or ERR code
         """
         self.log.debug("measure m1m3")
         msg = "!CMDEXE:M1M3"
@@ -152,6 +180,10 @@ class AlignmentModel():
     async def measure_cam(self):
         """
         Execute Camera measurement plan
+        
+        Returns
+        -------
+        ACK300 or ERR code
         """
 
         if self.first_measurement:
@@ -169,6 +201,10 @@ class AlignmentModel():
         """
         Query M2 position after running the M2 MP
         Position queries are always in terms of M1M3 coordinate frame
+        
+        Returns
+        -------
+        M2 Coordinate String
         """
 
         self.log.debug("query m2")
@@ -180,6 +216,10 @@ class AlignmentModel():
         """
         Query M1m3 position after running the MP
         Position queries are always in terms of M1M3 coordinate frame
+        
+        Returns
+        -------
+        M1M3 Coordinate String
         """
 
         self.log.debug("query m1m3")
@@ -191,6 +231,10 @@ class AlignmentModel():
         """
         Query cam position after running the MP
         Position queries are always in terms of M1M3 coordinate frame
+        
+        Returns
+        -------
+        Camera Coordinate String
         """
 
         self.log.debug("query cam")
@@ -210,6 +254,10 @@ class AlignmentModel():
             Name of point
         collection : String
             name of collection the point is in. Default "A"
+        
+        Returns
+        -------
+        Point Coordiante String 
         """
         msg = f"?POINT_POS:{collection};{pointgroup};{point}"
         data = await self.send_msg(msg)
@@ -224,6 +272,10 @@ class AlignmentModel():
         refPtGrp : String
             name of pointgroup that will be used as the frame of reference for
             the offset.
+        
+        Returns
+        -------
+        M2 Offset String
         """
 
         msg = "?OFFSET:" + refPtGrp + ";M2"
@@ -239,6 +291,10 @@ class AlignmentModel():
         refPtGrp : String
             name of pointgroup that will be used as the frame of reference for
             the offset.
+        
+        Returns
+        -------
+        M1M3 Offset String
         """
 
         msg = "?OFFSET:" + refPtGrp + ";M1M3"
@@ -254,6 +310,10 @@ class AlignmentModel():
         refPtGrp : String
             name of pointgroup that will be used as the frame of reference for
             the offset.
+        
+        Returns
+        -------
+        Camera Offset String
         """
 
         msg = "?OFFSET:" + refPtGrp + ";CAM"
@@ -278,6 +338,10 @@ class AlignmentModel():
             Name of point 2
         p2collection : String
             name of collection point 2 is in. Default "A"
+        
+        Returns
+        -------
+        Point Delta or ERR code
         """
         msg = f"?POINT_DELTA:{p1collection};{p1group};{p1};{p2collection};{p2group};{p2}"
         data = await self.send_msg(msg)
@@ -286,6 +350,7 @@ class AlignmentModel():
     async def clear_errors(self):
         """
         Clear errors, or return a -300 if we cant clear them
+        This may be deprecated soon
         """
 
         msg = "!CLERCL"
@@ -300,6 +365,10 @@ class AlignmentModel():
         ----------
         randomize_points : Boolean
             True to randomize point order
+        
+        Returns
+        -------
+        ACK300 or ERR code
         """
 
         if randomize_points:
@@ -312,12 +381,16 @@ class AlignmentModel():
     async def set_power_lock(self, power_lock):
         """
         enable/disable the Tracker's IR camera which helps it find SMRs, but
-        can also cause it to lock on to thee wrong one sometimes.
+        can also cause it to lock on to the wrong one sometimes.
 
         Parameters
         ----------
         power_lock : Boolean
             True to enable the IR camera assist
+        
+        Returns
+        -------
+        ACK300 or ERR code
         """
 
         if power_lock:
@@ -335,6 +408,10 @@ class AlignmentModel():
         ----------
         pointgroup : `str`
             Name of the point group to use for 2 face check.
+        
+        Returns
+        -------
+        ACK300 or ERR code
         """
 
         msg = "!2FACE_CHECK:" + pointgroup
@@ -349,6 +426,10 @@ class AlignmentModel():
         ----------
         pointgroup : `str`
             Name of the point group for drift check.
+        
+        Returns
+        -------
+        ACK300 or ERR code
         """
 
         msg = "!MEAS_DRIFT:" + pointgroup
@@ -366,6 +447,10 @@ class AlignmentModel():
             Name of the point group that contains the target point.
         target : `str`
             Name of the targe within pointgroup
+        
+        Returns
+        -------
+        ACK300 or ERR code
         """
 
         msg = f"!MEAS_SINGLE_POINT:{collection};{pointgroup};{target}"
@@ -380,6 +465,10 @@ class AlignmentModel():
         ----------
         profile : `str`
             Name of the profile.
+
+        Returns
+        -------
+        ACK300 or ERR code
         """
 
         msg = "!SINGLE_POINT_MEAS_PROFILE:" + profile
@@ -394,6 +483,10 @@ class AlignmentModel():
         ----------
         reportname : `str`
             Name of the report
+        
+        Returns
+        -------
+        ACK300 or ERR code
         """
 
         msg = "!GEN_REPORT:" + reportname
@@ -408,6 +501,10 @@ class AlignmentModel():
         ----------
         tolerance : `float`
             (TODO find out what the range is)
+        
+        Returns
+        -------
+        ACK300 or ERR code
         """
 
         msg = "!SET_2FACE_TOL:" + tolerance
@@ -425,6 +522,10 @@ class AlignmentModel():
             rms tolerance
         max_tol : `float`
             max tolerance
+        
+        Returns
+        -------
+        ACK300 or ERR code
         """
 
         msg = f"!SET_DRIFT_TOL:{rms_tol};{max_tol}"
@@ -433,7 +534,7 @@ class AlignmentModel():
 
     async def set_ls_tolerance(self, rms_tol, max_tol):
         """
-        not actually sure how this one differs from the previous...
+        sets the least squares tolerance
 
         Parameters
         ----------
@@ -441,6 +542,10 @@ class AlignmentModel():
             rms tolerance
         max_tol : `float`
             max tolerance
+        
+        Returns
+        -------
+        ACK300 or ERR code
         """
 
         msg = f"!SET_LS_TOL:{rms_tol};{max_tol}"
@@ -455,6 +560,10 @@ class AlignmentModel():
         ----------
         filepath : `str`
             filepath to template file
+        
+        Returns
+        -------
+        ACK300 or ERR code
         """
 
         msg = "!LOAD_SA_TEMPLATE_FILE;" + filepath
@@ -470,6 +579,10 @@ class AlignmentModel():
         pointgroup : `str`
             Name of SA Pointgroup to use as reference
 
+        
+        Returns
+        -------
+        ACK300 or ERR code
         """
 
         msg = "!SET_REFERENCE_GROUP:" + pointgroup
@@ -486,6 +599,10 @@ class AlignmentModel():
         ----------
         workingframe : `str`
             frame to set as working frame
+        
+        Returns
+        -------
+        ACK300 or ERR code
         """
 
         msg = "!SET_WORKING_FRAME:" + workingframe
@@ -495,6 +612,10 @@ class AlignmentModel():
     async def new_station(self):
         """
         A new station is added and made to be the active instrument.
+        
+        Returns
+        -------
+        ACK300 or ERR code
         """
 
         msg = "!NEW_STATION"
@@ -509,6 +630,10 @@ class AlignmentModel():
         ----------
         filepath : `str`
             where to save the job file
+        
+        Returns
+        -------
+        ACK300 or ERR code
         """
 
         msg = "!SAVE_SA_JOBFILE;" + filepath
@@ -524,6 +649,10 @@ class AlignmentModel():
         ----------
         locked : `Boolean`
             whether the station locks
+        
+        Returns
+        -------
+        ACK300 or ERR code
         """
         if station_locked:
             msg = "!SET_STATION_LOCK:1"
@@ -535,6 +664,10 @@ class AlignmentModel():
     async def reset_t2sa(self):
         """
         Reboots the T2SA and SA components
+        
+        Returns
+        -------
+        ACK300 or ERR code
         """
 
         msg = "!RESET_T2SA"
@@ -545,6 +678,10 @@ class AlignmentModel():
         """
         Commands T2SA to halt any measurement plans currently executing,
         and return to ready state
+        
+        Returns
+        -------
+        ACK300 or ERR code
         """
 
         msg = "!HALT"
@@ -566,6 +703,10 @@ class AlignmentModel():
             azimuth of telescope
         camrot : `float`
             camera rotation
+        
+        Returns
+        -------
+        ACK300 or ERR code
         """
 
         msg = f"PUBLISH_ALT_AZ_ROT:{telalt};{telaz};{camrot}"
@@ -581,6 +722,10 @@ class AlignmentModel():
         ----------
         numsamples : `int`
             Number of samples
+        
+        Returns
+        -------
+        ACK300 or ERR code
         """
 
         msg = f"SET_NUM_SAMPLES:{numsamples}"
@@ -596,6 +741,10 @@ class AlignmentModel():
         ----------
         numiters : `Int`
             number of iterations
+        
+        Returns
+        -------
+        ACK300 or ERR code
         """
 
         msg = f"SET_NUM_ITERATIONS:{numiters}"
@@ -610,6 +759,10 @@ class AlignmentModel():
         ----------
         idx : `Int`
             Index
+        
+        Returns
+        -------
+        ACK300 or ERR code
         """
 
         msg = f"INC_MEAS_INDEX:{idx}"
@@ -622,6 +775,10 @@ class AlignmentModel():
         changes will be applied immediately but will not persist if T2SA
         quits unexpectedly
 
+        
+        Returns
+        -------
+        ACK300 or ERR code
         """
 
         msg = "!SAVE_SETTINGS"
@@ -636,6 +793,10 @@ class AlignmentModel():
         ----------
         compfile : `String`
             name and  filepath to compensation profile file
+        
+        Returns
+        -------
+        ACK300 or ERR code
         """
 
         msg = "!LOAD_TRACKER_COMPENSATION:" + compfile

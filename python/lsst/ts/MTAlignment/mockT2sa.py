@@ -1,5 +1,4 @@
 import asyncio
-from random import randrange
 import logging
 
 
@@ -8,12 +7,13 @@ class MockT2SA():
     Emulates New River Kinematics's T2SA application.
     """
 
-    def __init__(self, ip="172.17.0.3"):
+    def __init__(self, ip="127.0.0.1"):
         self.server = None
         self.ip = ip
         self.measuring = False
         self.log = logging.getLogger()
         self.run_loop_flag = True
+        self._measure_task = None
         self.response_dict = {"?STAT": self.status,
                               "!CMDEXE:M1M3": self.execute_measurement_plan,
                               "!CMDEXE:CAM": self.execute_measurement_plan,
@@ -87,12 +87,23 @@ class MockT2SA():
         """
 
         self.log.debug("begin measuring")
+        # Schedule task that will emulate measurement in the background
+        if self._measure_task is None or self._measure_task.done():
+            self.measuring = True
+            self._measure_task = asyncio.create_task(self.measure_task())
+        else:
+            # this need to fail
+            ack = "ACK000\r\n"
+            writer.write(ack.encode())
+            await writer.drain()
         ack = "ACK300\r\n"
         writer.write(ack.encode())
         await writer.drain()
 
-        self.measuring = True
-        await asyncio.sleep(randrange(5, 15))
+    async def measure_task(self):
+        """ Emulate measurement plan.
+        """
+        await asyncio.sleep(2)
         self.measuring = False
         self.log.debug("done measuring")
 

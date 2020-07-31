@@ -222,7 +222,8 @@ class AlignmentModel():
         Parameters
         ----------
         refPtGrp : String
-            name of pointgroup that will be used as the frame of reference for the offset.
+            name of pointgroup that will be used as the frame of reference for
+            the offset.
         """
 
         msg = "?OFFSET:" + refPtGrp + ";M2"
@@ -232,11 +233,12 @@ class AlignmentModel():
     async def query_m1m3_offset(self, refPtGrp="M1M3"):
         """
         Query M1m3 offset from nominal
-        
+
         Parameters
         ----------
         refPtGrp : String
-            name of pointgroup that will be used as the frame of reference for the offset.
+            name of pointgroup that will be used as the frame of reference for
+            the offset.
         """
 
         msg = "?OFFSET:" + refPtGrp + ";M1M3"
@@ -250,7 +252,8 @@ class AlignmentModel():
         Parameters
         ----------
         refPtGrp : String
-            name of pointgroup that will be used as the frame of reference for the offset.
+            name of pointgroup that will be used as the frame of reference for
+            the offset.
         """
 
         msg = "?OFFSET:" + refPtGrp + ";CAM"
@@ -308,7 +311,7 @@ class AlignmentModel():
 
     async def set_power_lock(self, power_lock):
         """
-        enable/disable the Tracker's IR camera which helps it find SMRs, but 
+        enable/disable the Tracker's IR camera which helps it find SMRs, but
         can also cause it to lock on to thee wrong one sometimes.
 
         Parameters
@@ -371,7 +374,7 @@ class AlignmentModel():
 
     async def single_point_measurement_profile(self, profile):
         """
-        Sets a measurement profile in SA. 
+        Sets a measurement profile in SA.
 
         Parameters
         ----------
@@ -430,7 +433,6 @@ class AlignmentModel():
 
     async def set_ls_tolerance(self, rms_tol, max_tol):
         """
-        
         not actually sure how this one differs from the previous...
 
         Parameters
@@ -477,7 +479,8 @@ class AlignmentModel():
     async def set_working_frame(self, workingframe):
         """
         Make workingframe the working frame:
-        This is the frame whose coordinate system all coordinates will be provided relative to
+        This is the frame whose coordinate system all coordinates will be
+        provided relative to
 
         Parameters
         ----------

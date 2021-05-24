@@ -8,5 +8,16 @@
 *.json
 *.css
 tests/.tests.*
+.pytest_cache
+.coverage*
+pytest_session.txt
+.scon*
+*.log
+__pycache__
+tests/.tests
 version.py
+.eggs
+*.egg_info
+.swp
+.vscode
 

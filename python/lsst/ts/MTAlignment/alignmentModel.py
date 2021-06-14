@@ -18,8 +18,7 @@ class TrackerStatus(IntEnum):
     ERR = 6
 
 
-class AlignmentModel():
-
+class AlignmentModel:
     def __init__(self, host, port):
         self.host = host
         self.port = port
@@ -49,10 +48,10 @@ class AlignmentModel():
         from the tracker. This is likely to be deprecated later.
         """
         async with self.com_lock:
-            wait_states = ("EMP\r\n")
-            msg = bytes("?STAT\r\n", 'ascii')
+            wait_states = "EMP\r\n"
+            msg = bytes("?STAT\r\n", "ascii")
             self.writer.write(msg)
-            await self. writer.drain()
+            await self.writer.drain()
             data = await self.reader.read(64)
             stat = data.decode()
             if stat == "INIT" or stat == "INIT\r\n":
@@ -61,7 +60,7 @@ class AlignmentModel():
             while stat in wait_states:
                 await asyncio.sleep(0.3)
                 self.writer.write(msg)
-                await self. writer.drain()
+                await self.writer.drain()
                 data = await self.reader.read(64)
                 stat = data.decode()
             await asyncio.sleep(0.5)
@@ -77,13 +76,13 @@ class AlignmentModel():
         """
         msg = msg + "\r\n"
         if type(msg) == str:  # this may move
-            msg = bytes(msg, 'ascii')
+            msg = bytes(msg, "ascii")
         self.log.debug(f"sending {msg}")
         async with self.com_lock:
             self.writer.write(msg)
-            await self. writer.drain()
-            data = await self.reader.readuntil(separator=bytes("\n", 'ascii'))
-            self.log.debug(f'Received: {data.decode()!r}')
+            await self.writer.drain()
+            data = await self.reader.readuntil(separator=bytes("\n", "ascii"))
+            self.log.debug(f"Received: {data.decode()!r}")
             return data.decode()
 
     async def check_status(self):
@@ -128,7 +127,7 @@ class AlignmentModel():
     async def laser_on(self):
         """
         Turns the Tracker Laser on (for warmup purposes)
-        
+
         Returns
         -------
         ACK300 or ERR code
@@ -150,7 +149,7 @@ class AlignmentModel():
     async def measure_m2(self):
         """
         Execute M2 measurement plan
-        
+
         Returns
         -------
         ACK300 or ERR code
@@ -165,7 +164,7 @@ class AlignmentModel():
     async def measure_m1m3(self):
         """
         Execute M1M3 measurement plan
-        
+
         Returns
         -------
         ACK300 or ERR code
@@ -180,7 +179,7 @@ class AlignmentModel():
     async def measure_cam(self):
         """
         Execute Camera measurement plan
-        
+
         Returns
         -------
         ACK300 or ERR code
@@ -201,7 +200,7 @@ class AlignmentModel():
         """
         Query M2 position after running the M2 MP
         Position queries are always in terms of M1M3 coordinate frame
-        
+
         Returns
         -------
         M2 Coordinate String
@@ -216,7 +215,7 @@ class AlignmentModel():
         """
         Query M1m3 position after running the MP
         Position queries are always in terms of M1M3 coordinate frame
-        
+
         Returns
         -------
         M1M3 Coordinate String
@@ -231,7 +230,7 @@ class AlignmentModel():
         """
         Query cam position after running the MP
         Position queries are always in terms of M1M3 coordinate frame
-        
+
         Returns
         -------
         Camera Coordinate String
@@ -254,10 +253,10 @@ class AlignmentModel():
             Name of point
         collection : String
             name of collection the point is in. Default "A"
-        
+
         Returns
         -------
-        Point Coordiante String 
+        Point Coordiante String
         """
         msg = f"?POINT_POS:{collection};{pointgroup};{point}"
         data = await self.send_msg(msg)
@@ -272,7 +271,7 @@ class AlignmentModel():
         refPtGrp : String
             name of pointgroup that will be used as the frame of reference for
             the offset.
-        
+
         Returns
         -------
         M2 Offset String
@@ -291,7 +290,7 @@ class AlignmentModel():
         refPtGrp : String
             name of pointgroup that will be used as the frame of reference for
             the offset.
-        
+
         Returns
         -------
         M1M3 Offset String
@@ -310,7 +309,7 @@ class AlignmentModel():
         refPtGrp : String
             name of pointgroup that will be used as the frame of reference for
             the offset.
-        
+
         Returns
         -------
         Camera Offset String
@@ -320,7 +319,9 @@ class AlignmentModel():
         data = await self.send_msg(msg)
         return data
 
-    async def query_point_delta(self, p1group, p1, p2group, p2, p1collection="A", p2collection="A"):
+    async def query_point_delta(
+        self, p1group, p1, p2group, p2, p1collection="A", p2collection="A"
+    ):
         """
         Query delta between two points
 
@@ -338,12 +339,14 @@ class AlignmentModel():
             Name of point 2
         p2collection : String
             name of collection point 2 is in. Default "A"
-        
+
         Returns
         -------
         Point Delta or ERR code
         """
-        msg = f"?POINT_DELTA:{p1collection};{p1group};{p1};{p2collection};{p2group};{p2}"
+        msg = (
+            f"?POINT_DELTA:{p1collection};{p1group};{p1};{p2collection};{p2group};{p2}"
+        )
         data = await self.send_msg(msg)
         return data
 
@@ -365,7 +368,7 @@ class AlignmentModel():
         ----------
         randomize_points : Boolean
             True to randomize point order
-        
+
         Returns
         -------
         ACK300 or ERR code
@@ -387,7 +390,7 @@ class AlignmentModel():
         ----------
         power_lock : Boolean
             True to enable the IR camera assist
-        
+
         Returns
         -------
         ACK300 or ERR code
@@ -408,7 +411,7 @@ class AlignmentModel():
         ----------
         pointgroup : `str`
             Name of the point group to use for 2 face check.
-        
+
         Returns
         -------
         ACK300 or ERR code
@@ -426,7 +429,7 @@ class AlignmentModel():
         ----------
         pointgroup : `str`
             Name of the point group for drift check.
-        
+
         Returns
         -------
         ACK300 or ERR code
@@ -447,7 +450,7 @@ class AlignmentModel():
             Name of the point group that contains the target point.
         target : `str`
             Name of the targe within pointgroup
-        
+
         Returns
         -------
         ACK300 or ERR code
@@ -483,7 +486,7 @@ class AlignmentModel():
         ----------
         reportname : `str`
             Name of the report
-        
+
         Returns
         -------
         ACK300 or ERR code
@@ -501,7 +504,7 @@ class AlignmentModel():
         ----------
         tolerance : `float`
             (TODO find out what the range is)
-        
+
         Returns
         -------
         ACK300 or ERR code
@@ -522,7 +525,7 @@ class AlignmentModel():
             rms tolerance
         max_tol : `float`
             max tolerance
-        
+
         Returns
         -------
         ACK300 or ERR code
@@ -542,7 +545,7 @@ class AlignmentModel():
             rms tolerance
         max_tol : `float`
             max tolerance
-        
+
         Returns
         -------
         ACK300 or ERR code
@@ -560,7 +563,7 @@ class AlignmentModel():
         ----------
         filepath : `str`
             filepath to template file
-        
+
         Returns
         -------
         ACK300 or ERR code
@@ -579,7 +582,7 @@ class AlignmentModel():
         pointgroup : `str`
             Name of SA Pointgroup to use as reference
 
-        
+
         Returns
         -------
         ACK300 or ERR code
@@ -599,7 +602,7 @@ class AlignmentModel():
         ----------
         workingframe : `str`
             frame to set as working frame
-        
+
         Returns
         -------
         ACK300 or ERR code
@@ -612,7 +615,7 @@ class AlignmentModel():
     async def new_station(self):
         """
         A new station is added and made to be the active instrument.
-        
+
         Returns
         -------
         ACK300 or ERR code
@@ -630,7 +633,7 @@ class AlignmentModel():
         ----------
         filepath : `str`
             where to save the job file
-        
+
         Returns
         -------
         ACK300 or ERR code
@@ -649,7 +652,7 @@ class AlignmentModel():
         ----------
         locked : `Boolean`
             whether the station locks
-        
+
         Returns
         -------
         ACK300 or ERR code
@@ -664,7 +667,7 @@ class AlignmentModel():
     async def reset_t2sa(self):
         """
         Reboots the T2SA and SA components
-        
+
         Returns
         -------
         ACK300 or ERR code
@@ -678,7 +681,7 @@ class AlignmentModel():
         """
         Commands T2SA to halt any measurement plans currently executing,
         and return to ready state
-        
+
         Returns
         -------
         ACK300 or ERR code
@@ -703,7 +706,7 @@ class AlignmentModel():
             azimuth of telescope
         camrot : `float`
             camera rotation
-        
+
         Returns
         -------
         ACK300 or ERR code
@@ -722,7 +725,7 @@ class AlignmentModel():
         ----------
         numsamples : `int`
             Number of samples
-        
+
         Returns
         -------
         ACK300 or ERR code
@@ -741,7 +744,7 @@ class AlignmentModel():
         ----------
         numiters : `Int`
             number of iterations
-        
+
         Returns
         -------
         ACK300 or ERR code
@@ -759,7 +762,7 @@ class AlignmentModel():
         ----------
         idx : `Int`
             Index
-        
+
         Returns
         -------
         ACK300 or ERR code
@@ -775,7 +778,7 @@ class AlignmentModel():
         changes will be applied immediately but will not persist if T2SA
         quits unexpectedly
 
-        
+
         Returns
         -------
         ACK300 or ERR code
@@ -793,7 +796,7 @@ class AlignmentModel():
         ----------
         compfile : `String`
             name and  filepath to compensation profile file
-        
+
         Returns
         -------
         ACK300 or ERR code

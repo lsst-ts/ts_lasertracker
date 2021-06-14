@@ -32,9 +32,10 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                     "measureTarget",
                     "measurePoint",
                     "laserPower",
-                    "healthCheck"
+                    "healthCheck",
                 ]
             )
+
 
 if __name__ == "__main__":
     unittest.main()

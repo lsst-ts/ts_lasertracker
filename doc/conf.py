@@ -8,6 +8,8 @@ import lsst.ts.MTAlignment
 
 
 _g = globals()
-_g.update(build_package_configs(
-    project_name='ts_MTAlignment',
-    version=lsst.ts.MTAlignment.version.__version__))
+_g.update(
+    build_package_configs(
+        project_name="ts_MTAlignment", version=lsst.ts.MTAlignment.version.__version__
+    )
+)

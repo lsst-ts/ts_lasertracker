@@ -1,4 +1,4 @@
-from alignmentModel import AlignmentModel
+from .alignmentModel import AlignmentModel
 from lsst.ts import salobj
 import enum
 from .config_schema import CONFIG_SCHEMA
@@ -15,7 +15,20 @@ class ASCDetailedState(enum.IntEnum):
 
 
 class AlignmentCSC(salobj.ConfigurableCsc):
-    def __init__(self, ip):
+    version = __version__
+    valid_simulation_modes = (0, 1)
+
+    def __init__(
+        self, config_dir=None, initial_state=salobj.State.STANDBY, simulation_mode=0
+    ):
+        super().__init__(
+            "MTAlignment",
+            index=0,
+            config_schema=CONFIG_SCHEMA,
+            config_dir=config_dir,
+            initial_state=initial_state,
+            simulation_mode=simulation_mode,
+        )
         self.model = None
         self.max_iters = 3
 
@@ -26,11 +39,37 @@ class AlignmentCSC(salobj.ConfigurableCsc):
         self.camrot = 0
 
     async def handle_summary_state(self):
-        if self.model is None:
-            self.model = AlignmentModel(ip, 50000)
+        if self.disabled_or_enabled:
+            if self.model is None:
+                self.model = AlignmentModel(self.config.t2sa_ip, self.config.t2sa_port)
+        else:
+            self.model = None
+
+    async def configure(self, config):
+        self.config = config
+
+    async def get_config_pkg(self):
+        pass
+
+    async def do_align(self):
+        pass
+
+    async def do_healthCheck(self):
+        pass
+
+    async def do_laserPower(self):
+        pass
+
+    async def do_measurePoint(self):
+        pass
+
+    async def do_measureTarget(self):
+        pass
 
     async def correction_loop(self):
-        await self.model.set_telescope_position(self.elevation, self.azimuth, self.camrot)
+        await self.model.set_telescope_position(
+            self.elevation, self.azimuth, self.camrot
+        )
 
         await self.model.measure_m1m3()
         aligned = False

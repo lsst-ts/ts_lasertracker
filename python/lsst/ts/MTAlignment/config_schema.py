@@ -33,7 +33,9 @@ properties:
     type: boolean
     default: false
   station_lock:
-    description: if true, prevents SpatialAnalyzer from automatically jumping stations if it detects that the tracker has drifted
+    description: >-
+      if true, prevents SpatialAnalyzer from automatically jumping stations
+      if it detects that the tracker has drifted
     type: boolean
     default: false
   rms_tolerance:
@@ -45,7 +47,9 @@ properties:
     type: number
     default: 1.0
   two_face_tolerance:
-    description: maximum allowed divergence when measuring the same point using the trackers two different "facings" in decimal degrees
+    description: >-
+      maximum allowed divergence when measuring the same point using the
+      tracker's two different "facings" in decimal degrees
     type: number
     default: 0.001
   rms_drift_tolerance:
@@ -57,7 +61,7 @@ properties:
     type: number
     default: 1.0
   power_lock:
-    description: if true, enables the tracker’s camera (used to help search for SMRs). 
+    description: if true, enables the tracker’s camera (used to help search for SMRs).
     type: boolean
     default: true
 """

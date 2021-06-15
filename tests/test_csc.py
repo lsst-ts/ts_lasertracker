@@ -1,7 +1,5 @@
 import pathlib
-import asyncio
 import unittest
-from random import randrange
 from lsst.ts import salobj
 from lsst.ts import MTAlignment
 

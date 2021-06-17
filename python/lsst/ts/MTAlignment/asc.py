@@ -5,7 +5,7 @@ from .config_schema import CONFIG_SCHEMA
 from . import __version__
 
 
-class ASCDetailedState(enum.IntEnum):
+class AlignmentDetailedState(enum.IntEnum):
     DISABLED = 1
     ENABLED = 2
     FAULT = 3
@@ -16,7 +16,20 @@ class ASCDetailedState(enum.IntEnum):
 
 class AlignmentCSC(salobj.ConfigurableCsc):
     version = __version__
-    valid_simulation_modes = (0, 1)
+    valid_simulation_modes = (0, 1, 2)
+    simulation_help = """
+    Simulation mode 1 does not fully simulate the CSC, but rather
+    taps into the simulation features of SpatialAnalyzer. This should allow
+    us to exercise the vendor code in tests and also a very robust simulation
+    of actual alignment operations, but it means simulation mode 1 still
+    relies on being able to make a TCP connection to the vendor provided T2SA
+    application, which must be hosted on a Windows machine or VM with a
+    licensed copy of SpatialAnalyzer.
+
+    Simulation mode 2 can be run locally without T2SA, but it only accepts
+    connections and then acts as a glorified dictionary that returns a few
+    canned responses.
+    """
 
     def __init__(
         self, config_dir=None, initial_state=salobj.State.STANDBY, simulation_mode=0
@@ -48,22 +61,70 @@ class AlignmentCSC(salobj.ConfigurableCsc):
     async def configure(self, config):
         self.config = config
 
+    @staticmethod
     async def get_config_pkg(self):
+        return "ts_config_mttcs"
+
+    async def do_measureTarget(self):
+        """Measure and return coordinates of a target. Options are
+        M1M3, M2, CAM, and DOME"""
         pass
 
     async def do_align(self):
+        """Perform correction loop"""
         pass
 
     async def do_healthCheck(self):
+        """run healthcheck script"""
         pass
 
     async def do_laserPower(self):
+        """put the laser in sleep state"""
+        pass
+
+    async def do_powerOff(self):
+        """full power off of tracker and interface"""
         pass
 
     async def do_measurePoint(self):
+        """measure and return coords of a specific point"""
         pass
 
-    async def do_measureTarget(self):
+    async def do_pointDelta(self):
+        """return a vector between two points"""
+        pass
+
+    async def do_setReferenceGroup(self):
+        """Nominal point group to locate tracker station to and provide data
+        relative to"""
+        pass
+
+    async def do_setWorkingFrame(self):
+        """attempt to set the passed string as the SpatialAnalyzer working frame"""
+        pass
+
+    async def do_halt(self):
+        """halts any executing measurement plan and returns to ready state"""
+        pass
+
+    async def do_loadSATemplateFile(self):
+        """SA Template file path and name. This is in the filesystem on the T2SA host."""
+        pass
+
+    async def do_measureDrift(self):
+        """measure tracker drift"""
+        pass
+
+    async def do_resetT2SA(self):
+        """reboots t2sa and SA"""
+        pass
+
+    async def do_newStation(self):
+        """create new tracker station"""
+        pass
+
+    async def do_saveJobfile(self):
+        """save job file"""
         pass
 
     async def correction_loop(self):

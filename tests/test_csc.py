@@ -27,10 +27,20 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         ):
             await self.check_standard_state_transitions(
                 enabled_commands=[
-                    "measureTarget",
+                    "align" "measureTarget",
                     "measurePoint",
                     "laserPower",
                     "healthCheck",
+                    "powerOff",
+                    "pointDelta",
+                    "setReferenceGroup",
+                    "halt",
+                    "setWorkingFrame",
+                    "loadSATemplateFile",
+                    "measureDrift",
+                    "resetT2SA",
+                    "newStation",
+                    "saveJobFile",
                 ]
             )
 

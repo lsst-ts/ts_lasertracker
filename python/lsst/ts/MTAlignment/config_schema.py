@@ -64,5 +64,9 @@ properties:
     description: if true, enables the tracker’s camera (used to help search for SMRs).
     type: boolean
     default: true
+  single_point_measurement_profile:
+    description: name of Spatial Analyzer measurement profile
+    type: string
+    default: "Single Pt. To SA"
 """
 )

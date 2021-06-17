@@ -12,6 +12,10 @@ class AlignmentDetailedState(enum.IntEnum):
     OFFLINE = 4
     STANDBY = 5
     MEASURING = 6
+    TWOFACE_CHECK = 7
+    ADM_CHECK = 8
+    DRIFT_CHECK = 9
+    
 
 
 class AlignmentCSC(salobj.ConfigurableCsc):
@@ -100,7 +104,8 @@ class AlignmentCSC(salobj.ConfigurableCsc):
         pass
 
     async def do_setWorkingFrame(self):
-        """attempt to set the passed string as the SpatialAnalyzer working frame"""
+        """attempt to set the passed string as the SpatialAnalyzer working
+        frame"""
         pass
 
     async def do_halt(self):
@@ -108,7 +113,8 @@ class AlignmentCSC(salobj.ConfigurableCsc):
         pass
 
     async def do_loadSATemplateFile(self):
-        """SA Template file path and name. This is in the filesystem on the T2SA host."""
+        """SA Template file path and name. This is in the filesystem on the
+        T2SA host."""
         pass
 
     async def do_measureDrift(self):

@@ -2,7 +2,7 @@ import asyncio
 import logging
 
 
-class MockT2SA():
+class MockT2SA:
     """
     Emulates New River Kinematics's T2SA application.
     """
@@ -14,28 +14,31 @@ class MockT2SA():
         self.log = logging.getLogger()
         self.run_loop_flag = True
         self._measure_task = None
-        self.response_dict = {"?STAT": self.status,
-                              "!CMDEXE:M1M3": self.execute_measurement_plan,
-                              "!CMDEXE:CAM": self.execute_measurement_plan,
-                              "!CMDEXE:M2": self.execute_measurement_plan,
-                              "?POS M1M3": "<m1m3_coordinates>",
-                              "?POS CAM": "<cam_coordinates>",
-                              "?POS M2": "<m2_coordinates>",
-                              "?OFFSET M1M3": "<m1m3_offset>",
-                              "?OFFSET CAM": "<cam_offset>",
-                              "?OFFSET M2": "<m2_offset>",
-                              "?LSTA": "LON",
-                              "!LST:0": "ACK300",
-                              "!LST:1": "ACK300",
-                              "SET_RANDOMIZE_POINTS:1": "ACK300",
-                              "SET_RANDOMIZE_POINTS:0": "ACK300"
-                              }
+        self.response_dict = {
+            "?STAT": self.status,
+            "!CMDEXE:M1M3": self.execute_measurement_plan,
+            "!CMDEXE:CAM": self.execute_measurement_plan,
+            "!CMDEXE:M2": self.execute_measurement_plan,
+            "?POS M1M3": "<m1m3_coordinates>",
+            "?POS CAM": "<cam_coordinates>",
+            "?POS M2": "<m2_coordinates>",
+            "?OFFSET M1M3": "<m1m3_offset>",
+            "?OFFSET CAM": "<cam_offset>",
+            "?OFFSET M2": "<m2_offset>",
+            "?LSTA": "LON",
+            "!LST:0": "ACK300",
+            "!LST:1": "ACK300",
+            "SET_RANDOMIZE_POINTS:1": "ACK300",
+            "SET_RANDOMIZE_POINTS:0": "ACK300",
+        }
 
     async def start(self, timeout=5):
         """
         Start the server
         """
-        self.server = await asyncio.start_server(self.response_loop, host=self.ip, port=50000)
+        self.server = await asyncio.start_server(
+            self.response_loop, host=self.ip, port=50000
+        )
 
     async def stop(self, timeout=5):
         """
@@ -101,8 +104,7 @@ class MockT2SA():
         await writer.drain()
 
     async def measure_task(self):
-        """ Emulate measurement plan.
-        """
+        """Emulate measurement plan."""
         await asyncio.sleep(2)
         self.measuring = False
         self.log.debug("done measuring")

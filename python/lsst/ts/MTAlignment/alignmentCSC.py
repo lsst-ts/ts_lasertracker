@@ -15,7 +15,6 @@ class AlignmentDetailedState(enum.IntEnum):
     TWOFACE_CHECK = 7
     ADM_CHECK = 8
     DRIFT_CHECK = 9
-    
 
 
 class AlignmentCSC(salobj.ConfigurableCsc):
@@ -166,20 +165,28 @@ class AlignmentCSC(salobj.ConfigurableCsc):
         ----------
 
         t2sa_string : `str`
-            the ascii string from T2SA
+            the ascii string from T2SA. We expect an ascii string delimited
+            with colons and semicolons, formatted like this:
+
+            <s>;X:<n>;Y:<n>;Z:<n>;Rx:<n>;Ry:<n>;Rz:<n>;<date>
+
+            where <s> is the name of the reference frame and <n> is a
+            floating point value.
         """
         bits = [b.split(":") for b in t2sa_string.split(";")]
         coordsDict = {}
+        try:
+            # ref frame
+            coordsDict[bits[0][0]] = bits[0][1]
 
-        # ref frame
-        coordsDict[bits[0][0]] = bits[0][1]
+            # coords
+            for s in bits[1:7]:
+                coordsDict[s[0]] = float(s[1])
 
-        # coords
-        for s in bits[1:7]:
-            coordsDict[s[0]] = float(s[1])
-
-        # timestamp
-        coordsDict["Timestamp"] = f"{bits[7][0]}:{bits[7][1]}:{bits[7][2]}"
+            # timestamp
+            coordsDict["Timestamp"] = f"{bits[7][0]}:{bits[7][1]}:{bits[7][2]}"
+        except ValueError or IndexError:
+            raise Exception(f"Failed to parse coordinates string '{t2sa_string}' received from T2SA.")
         return coordsDict
 
     def in_tolerance(self, coords):

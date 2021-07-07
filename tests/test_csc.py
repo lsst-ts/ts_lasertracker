@@ -23,11 +23,12 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         async with self.make_csc(
             initial_state=salobj.State.STANDBY,
             config_dir=TEST_CONFIG_DIR,
-            simulation_mode=1,
+            simulation_mode=2,
         ):
             await self.check_standard_state_transitions(
                 enabled_commands=[
-                    "align" "measureTarget",
+                    "align",
+                    "measureTarget",
                     "measurePoint",
                     "laserPower",
                     "healthCheck",
@@ -40,7 +41,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                     "measureDrift",
                     "resetT2SA",
                     "newStation",
-                    "saveJobFile",
+                    "saveJobfile",
                 ]
             )
 

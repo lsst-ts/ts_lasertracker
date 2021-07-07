@@ -10,6 +10,7 @@ TEST_CONFIG_DIR = pathlib.Path(__file__).parents[1].joinpath("tests", "data", "c
 
 class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
     def basic_make_csc(self, initial_state, config_dir, simulation_mode):
+
         return MTAlignment.AlignmentCSC(
             initial_state=initial_state,
             config_dir=config_dir,
@@ -43,6 +44,16 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                     "newStation",
                     "saveJobfile",
                 ]
+            )
+
+    async def test_basics(self):
+        async with self.make_csc(
+            initial_state=salobj.State.STANDBY,
+            config_dir=TEST_CONFIG_DIR,
+            simulation_mode=2,
+        ):
+            await salobj.set_summary_state(
+                self.remote, salobj.State.ENABLED, settingsToApply="t2sa_test.yaml"
             )
 
 

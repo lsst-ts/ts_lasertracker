@@ -83,16 +83,19 @@ class AlignmentCSC(salobj.ConfigurableCsc):
         return "ts_config_mttcs"
 
     async def do_measureTarget(self, data):
-        self.log.debug(data)
+        self.log.debug("measure Target")
         """Measure and return coordinates of a target. Options are
         M1M3, M2, CAM, and DOME"""
         self.assert_enabled()
-        if data == "CAM":
-            await self.model.measure_cam()
-        elif data == "M2":
-            await self.model.measure_m2()
-        else:  # should eventually be an elif
-            await self.model.measure_m1m3()
+        if data.target == "CAM":
+            result = await self.model.measure_cam()
+        elif data.target == "M2":
+            result = await self.model.measure_m2()
+        elif data.target == "M1M3":
+            self.log.debug("measure m1m3")
+            result = await self.model.measure_m1m3()
+        self.log.debug(result)
+        
 
     async def do_align(self, data):
         """Perform correction loop"""

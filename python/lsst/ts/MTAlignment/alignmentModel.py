@@ -31,18 +31,23 @@ class AlignmentModel:
         self.simulation_mode = 0
         self.com_lock = asyncio.Lock()
 
-    async def connect(self):
+    async def connect(self, use_port_zero=False):
         """
         Connect to the T2SA host. Spin up a fake one for simulation mode 2.
+        In the case of use_port_zero, checks which port the mock server
+        was assigned and updates self.port accordingly
         """
         if self.simulation_mode == 2:
-            self.mock_t2sa = mockT2sa.MockT2SA()
-            self.log.debug("created mock t2sa")
-            await asyncio.wait_for(self.mock_t2sa.start(), 5)
+            if use_port_zero:
+                self.mock_t2sa = mockT2sa.MockT2SA(port=0)
+                self.port = await asyncio.wait_for(self.mock_t2sa.start(), 5)
+            else:
+                self.mock_t2sa = mockT2sa.MockT2SA()
+                await asyncio.wait_for(self.mock_t2sa.start(), 5)
             self.reader, self.writer = await asyncio.open_connection("127.0.0.1", self.port)
-            self.log.debug("connected to mock T2sa")
+            self.log.debug(f"connected to mock T2SA at 127.0.0.1:{self.port}")
         else:
-            self.log.debug("attempting to connect to real T2SA")
+            self.log.debug(f"attempting to connect to real T2SA at {self.host}:{self.port}")
             self.reader, self.writer = await asyncio.open_connection(
                 self.host,
                 self.port,

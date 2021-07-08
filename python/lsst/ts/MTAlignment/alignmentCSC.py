@@ -36,7 +36,7 @@ class AlignmentCSC(salobj.ConfigurableCsc):
     """
 
     def __init__(
-        self, config_dir=None, initial_state=salobj.State.STANDBY, simulation_mode=0
+        self, config_dir=None, initial_state=salobj.State.STANDBY, simulation_mode=0, use_port_zero=False
     ):
         super().__init__(
             "MTAlignment",
@@ -57,9 +57,9 @@ class AlignmentCSC(salobj.ConfigurableCsc):
         self.elevation = 90
         self.azimuth = 0
         self.camrot = 0
+        self.use_port_zero = use_port_zero
 
     async def handle_summary_state(self):
-        self.log.debug("handle_summary_state")
         if self.disabled_or_enabled:
             if self.model is None:
                 self.model = AlignmentModel(
@@ -69,7 +69,7 @@ class AlignmentCSC(salobj.ConfigurableCsc):
                 )
                 self.model.simulation_mode = self.simulation_mode
                 self.log.debug(f"trying to connect to {self.config.t2sa_ip}")
-                await self.model.connect()
+                await self.model.connect(self.simulation_mode)
         else:
             if self.model is not None:
                 await self.model.disconnect()
@@ -95,7 +95,6 @@ class AlignmentCSC(salobj.ConfigurableCsc):
             self.log.debug("measure m1m3")
             result = await self.model.measure_m1m3()
         self.log.debug(result)
-        
 
     async def do_align(self, data):
         """Perform correction loop"""

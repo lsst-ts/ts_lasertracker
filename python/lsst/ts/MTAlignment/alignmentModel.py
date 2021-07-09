@@ -38,12 +38,8 @@ class AlignmentModel:
         was assigned and updates self.port accordingly
         """
         if self.simulation_mode == 2:
-            if use_port_zero:
-                self.mock_t2sa = mockT2sa.MockT2SA(port=0)
-                self.port = await asyncio.wait_for(self.mock_t2sa.start(), 5)
-            else:
-                self.mock_t2sa = mockT2sa.MockT2SA()
-                await asyncio.wait_for(self.mock_t2sa.start(), 5)
+            self.mock_t2sa = mockT2sa.MockT2SA(port=0)
+            self.port = await asyncio.wait_for(self.mock_t2sa.start(), 5)
             self.reader, self.writer = await asyncio.open_connection("127.0.0.1", self.port)
             self.log.debug(f"connected to mock T2SA at 127.0.0.1:{self.port}")
         else:

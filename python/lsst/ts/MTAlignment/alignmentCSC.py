@@ -68,8 +68,8 @@ class AlignmentCSC(salobj.ConfigurableCsc):
                     log=self.log
                 )
                 self.model.simulation_mode = self.simulation_mode
-                self.log.debug(f"trying to connect to {self.config.t2sa_ip}")
-                await self.model.connect(self.simulation_mode)
+                await self.model.connect()
+                self.log.debug(f"mock t2sa is {self.model.host}:{self.model.port}")
         else:
             if self.model is not None:
                 await self.model.disconnect()
@@ -91,7 +91,7 @@ class AlignmentCSC(salobj.ConfigurableCsc):
             result = await self.model.measure_cam()
         elif data.target == "M2":
             result = await self.model.measure_m2()
-        elif data.target == "M1M3":
+        else:  # elif data.target == "M1M3":
             self.log.debug("measure m1m3")
             result = await self.model.measure_m1m3()
         self.log.debug(result)

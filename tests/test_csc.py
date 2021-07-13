@@ -10,6 +10,7 @@ TEST_CONFIG_DIR = pathlib.Path(__file__).parents[1].joinpath("tests", "data", "c
 
 class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
     def basic_make_csc(self, initial_state, config_dir, simulation_mode):
+
         return MTAlignment.AlignmentCSC(
             initial_state=initial_state,
             config_dir=config_dir,
@@ -23,11 +24,12 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         async with self.make_csc(
             initial_state=salobj.State.STANDBY,
             config_dir=TEST_CONFIG_DIR,
-            simulation_mode=1,
+            simulation_mode=2,
         ):
             await self.check_standard_state_transitions(
                 enabled_commands=[
-                    "align" "measureTarget",
+                    "align",
+                    "measureTarget",
                     "measurePoint",
                     "laserPower",
                     "healthCheck",
@@ -40,9 +42,20 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                     "measureDrift",
                     "resetT2SA",
                     "newStation",
-                    "saveJobFile",
+                    "saveJobfile",
                 ]
             )
+
+    async def test_basics(self):
+        async with self.make_csc(
+            initial_state=salobj.State.STANDBY,
+            config_dir=TEST_CONFIG_DIR,
+            simulation_mode=2,
+        ):
+            await salobj.set_summary_state(
+                self.remote, salobj.State.ENABLED, settingsToApply="t2sa_test.yaml"
+            )
+            await self.remote.cmd_measureTarget.set_start(target="M1M3", timeout=STD_TIMEOUT)
 
 
 if __name__ == "__main__":

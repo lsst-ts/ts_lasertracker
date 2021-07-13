@@ -1,6 +1,7 @@
 import asyncio
 from enum import IntEnum
 import logging
+from lsst.ts.MTAlignment import mockT2sa
 
 
 class LaserStatus(IntEnum):
@@ -19,22 +20,34 @@ class TrackerStatus(IntEnum):
 
 
 class AlignmentModel:
-    def __init__(self, host, port):
+    def __init__(self, host, port, log=logging.getLogger()):
         self.host = host
         self.port = port
-        self.log = logging.getLogger()
+        self.log = log
         self.connected = False
         self.reader = None
         self.writer = None
         self.first_measurement = True
-
+        self.simulation_mode = 0
         self.com_lock = asyncio.Lock()
 
-    async def connect(self):
+    async def connect(self, use_port_zero=False):
         """
-        Connect to the T2SA host
+        Connect to the T2SA host. Spin up a fake one for simulation mode 2.
+        In the case of use_port_zero, checks which port the mock server
+        was assigned and updates self.port accordingly
         """
-        self.reader, self.writer = await asyncio.open_connection(self.host, self.port)
+        if self.simulation_mode == 2:
+            self.mock_t2sa = mockT2sa.MockT2SA(port=0)
+            self.port = await asyncio.wait_for(self.mock_t2sa.start(), 5)
+            self.reader, self.writer = await asyncio.open_connection("127.0.0.1", self.port)
+            self.log.debug(f"connected to mock T2SA at 127.0.0.1:{self.port}")
+        else:
+            self.log.debug(f"attempting to connect to real T2SA at {self.host}:{self.port}")
+            self.reader, self.writer = await asyncio.open_connection(
+                self.host,
+                self.port,
+            )
         self.connected = True
 
     async def disconnect(self):

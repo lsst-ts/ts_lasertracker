@@ -7,9 +7,10 @@ class MockT2SA:
     Emulates New River Kinematics's T2SA application.
     """
 
-    def __init__(self, ip="127.0.0.1"):
+    def __init__(self, ip="127.0.0.1", port=50000):
         self.server = None
         self.ip = ip
+        self.port = port
         self.measuring = False
         self.log = logging.getLogger()
         self.run_loop_flag = True
@@ -37,8 +38,9 @@ class MockT2SA:
         Start the server
         """
         self.server = await asyncio.start_server(
-            self.response_loop, host=self.ip, port=50000
+            self.response_loop, host=self.ip, port=self.port
         )
+        return self.server.sockets[0].getsockname()[1]
 
     async def stop(self, timeout=5):
         """

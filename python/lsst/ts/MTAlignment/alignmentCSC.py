@@ -3,6 +3,7 @@ from lsst.ts import salobj
 import enum
 from .config_schema import CONFIG_SCHEMA
 from . import __version__
+import logging
 
 
 class AlignmentDetailedState(enum.IntEnum):
@@ -35,7 +36,7 @@ class AlignmentCSC(salobj.ConfigurableCsc):
     """
 
     def __init__(
-        self, config_dir=None, initial_state=salobj.State.STANDBY, simulation_mode=0
+        self, config_dir=None, initial_state=salobj.State.STANDBY, simulation_mode=0, use_port_zero=False
     ):
         super().__init__(
             "MTAlignment",
@@ -48,18 +49,31 @@ class AlignmentCSC(salobj.ConfigurableCsc):
         self.model = None
         self.max_iters = 3
 
+        self.log.addHandler(logging.StreamHandler())
+        self.log.setLevel(logging.DEBUG)
+
         # temporary variables for position; these will eventually be supplied
         # by the TMA and camera rotator CSCs.
         self.elevation = 90
         self.azimuth = 0
         self.camrot = 0
+        self.use_port_zero = use_port_zero
 
     async def handle_summary_state(self):
         if self.disabled_or_enabled:
             if self.model is None:
-                self.model = AlignmentModel(self.config.t2sa_ip, self.config.t2sa_port)
+                self.model = AlignmentModel(
+                    self.config.t2sa_ip,
+                    self.config.t2sa_port,
+                    log=self.log
+                )
+                self.model.simulation_mode = self.simulation_mode
+                await self.model.connect()
+                self.log.debug(f"mock t2sa is {self.model.host}:{self.model.port}")
         else:
-            self.model = None
+            if self.model is not None:
+                await self.model.disconnect()
+                self.model = None
 
     async def configure(self, config):
         self.config = config
@@ -68,69 +82,78 @@ class AlignmentCSC(salobj.ConfigurableCsc):
     async def get_config_pkg(self):
         return "ts_config_mttcs"
 
-    async def do_measureTarget(self):
+    async def do_measureTarget(self, data):
+        self.log.debug("measure Target")
         """Measure and return coordinates of a target. Options are
         M1M3, M2, CAM, and DOME"""
-        pass
+        self.assert_enabled()
+        if data.target == "CAM":
+            result = await self.model.measure_cam()
+        elif data.target == "M2":
+            result = await self.model.measure_m2()
+        else:  # elif data.target == "M1M3":
+            self.log.debug("measure m1m3")
+            result = await self.model.measure_m1m3()
+        self.log.debug(result)
 
-    async def do_align(self):
+    async def do_align(self, data):
         """Perform correction loop"""
-        pass
+        self.assert_enabled()
 
-    async def do_healthCheck(self):
+    async def do_healthCheck(self, data):
         """run healthcheck script"""
-        pass
+        self.assert_enabled()
 
-    async def do_laserPower(self):
+    async def do_laserPower(self, data):
         """put the laser in sleep state"""
-        pass
+        self.assert_enabled()
 
-    async def do_powerOff(self):
+    async def do_powerOff(self, data):
         """full power off of tracker and interface"""
-        pass
+        self.assert_enabled()
 
-    async def do_measurePoint(self):
+    async def do_measurePoint(self, data):
         """measure and return coords of a specific point"""
-        pass
+        self.assert_enabled()
 
-    async def do_pointDelta(self):
+    async def do_pointDelta(self, data):
         """return a vector between two points"""
-        pass
+        self.assert_enabled()
 
-    async def do_setReferenceGroup(self):
+    async def do_setReferenceGroup(self, data):
         """Nominal point group to locate tracker station to and provide data
         relative to"""
-        pass
+        self.assert_enabled()
 
-    async def do_setWorkingFrame(self):
+    async def do_setWorkingFrame(self, data):
         """attempt to set the passed string as the SpatialAnalyzer working
         frame"""
-        pass
+        self.assert_enabled()
 
-    async def do_halt(self):
+    async def do_halt(self, data):
         """halts any executing measurement plan and returns to ready state"""
-        pass
+        self.assert_enabled()
 
-    async def do_loadSATemplateFile(self):
+    async def do_loadSATemplateFile(self, data):
         """SA Template file path and name. This is in the filesystem on the
         T2SA host."""
-        pass
+        self.assert_enabled()
 
-    async def do_measureDrift(self):
+    async def do_measureDrift(self, data):
         """measure tracker drift"""
-        pass
+        self.assert_enabled()
 
-    async def do_resetT2SA(self):
+    async def do_resetT2SA(self, data):
         """reboots t2sa and SA"""
-        pass
+        self.assert_enabled()
 
-    async def do_newStation(self):
+    async def do_newStation(self, data):
         """create new tracker station"""
-        pass
+        self.assert_enabled()
 
-    async def do_saveJobfile(self):
+    async def do_saveJobfile(self, data):
         """save job file"""
-        pass
+        self.assert_enabled()
 
     async def correction_loop(self):
         await self.model.set_telescope_position(

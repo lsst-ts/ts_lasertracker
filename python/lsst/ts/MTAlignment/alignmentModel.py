@@ -35,8 +35,6 @@ class AlignmentModel:
     async def connect(self):
         """
         Connect to the T2SA host. Spin up a fake one for simulation mode 2.
-        In the case of use_port_zero, checks which port the mock server
-        was assigned and updates self.port accordingly
         """
         if self.simulation_mode == 2:
             self.mock_t2sa = mockT2sa.MockT2SA(port=0)

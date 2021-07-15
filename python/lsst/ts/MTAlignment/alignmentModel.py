@@ -2,6 +2,7 @@ import asyncio
 from enum import IntEnum
 import logging
 from lsst.ts.MTAlignment import mockT2sa
+from lsst.ts import tcpip
 
 
 class LaserStatus(IntEnum):
@@ -31,11 +32,9 @@ class AlignmentModel:
         self.simulation_mode = 0
         self.com_lock = asyncio.Lock()
 
-    async def connect(self, use_port_zero=False):
+    async def connect(self):
         """
         Connect to the T2SA host. Spin up a fake one for simulation mode 2.
-        In the case of use_port_zero, checks which port the mock server
-        was assigned and updates self.port accordingly
         """
         if self.simulation_mode == 2:
             self.mock_t2sa = mockT2sa.MockT2SA(port=0)
@@ -51,7 +50,7 @@ class AlignmentModel:
         self.connected = True
 
     async def disconnect(self):
-        self.writer.close()
+        await tcpip.close_stream_writer(self.writer)
         self.connected = False
 
     async def wait_for_ready(self):
@@ -65,18 +64,27 @@ class AlignmentModel:
             msg = bytes("?STAT\r\n", "ascii")
             self.writer.write(msg)
             await self.writer.drain()
-            data = await self.reader.read(64)
-            stat = data.decode()
-            if stat == "INIT" or stat == "INIT\r\n":
-                self.log.debug("waiting for init")
-                await asyncio.sleep(5)
-            while stat in wait_states:
-                await asyncio.sleep(0.3)
-                self.writer.write(msg)
-                await self.writer.drain()
+            try:
                 data = await self.reader.read(64)
                 stat = data.decode()
+                if stat == "INIT" or stat == "INIT\r\n":
+                    self.log.debug("waiting for init")
+                    await asyncio.sleep(5)
+                while stat in wait_states:
+                    await asyncio.sleep(0.3)
+                    self.writer.write(msg)
+                    await self.writer.drain()
+                    data = await self.reader.read(64)
+                    stat = data.decode()
+            except(asyncio.IncompleteReadError, ConnectionResetError):
+                self.handle_lost_connection()
+
             await asyncio.sleep(0.5)
+
+    async def handle_lost_connection(self):
+        """ Called when a connection is closed unexpectedly
+        """
+        pass
 
     async def send_msg(self, msg):
         """
@@ -94,7 +102,10 @@ class AlignmentModel:
         async with self.com_lock:
             self.writer.write(msg)
             await self.writer.drain()
-            data = await self.reader.readuntil(separator=bytes("\n", "ascii"))
+            try:
+                data = await self.reader.readuntil(separator=bytes("\n", "ascii"))
+            except(asyncio.IncompleteReadError, ConnectionResetError):
+                await self.handle_lost_connection()
             self.log.debug(f"Received: {data.decode()!r}")
             return data.decode()
 

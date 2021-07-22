@@ -17,17 +17,14 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             simulation_mode=simulation_mode,
         )
 
-    async def testBinScript(self):
-        await self.check_bin_script("MTAlignment", 0, "run_MTAlignment.py")
-
-    async def test_state_transitions(self):
+    async def test_state_transitions_t2sa(self):
         async with self.make_csc(
             initial_state=salobj.State.STANDBY,
             config_dir=TEST_CONFIG_DIR,
-            simulation_mode=2,
+            simulation_mode=1,
         ):
             await self.check_standard_state_transitions(
-                settingsToApply="sim_mode_2.yaml",
+                settingsToApply="t2sa_test.yaml",
                 enabled_commands=[
                     "align",
                     "measureTarget",
@@ -51,10 +48,21 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         async with self.make_csc(
             initial_state=salobj.State.STANDBY,
             config_dir=TEST_CONFIG_DIR,
-            simulation_mode=2,
+            simulation_mode=1,
         ):
             await salobj.set_summary_state(
-                self.remote, salobj.State.ENABLED, settingsToApply="sim_mode_2.yaml"
+                self.remote, salobj.State.ENABLED, settingsToApply="t2sa_test.yaml"
+            )
+            await self.remote.cmd_measureTarget.set_start(target="M1M3", timeout=STD_TIMEOUT)
+
+    async def test_measure(self):
+        async with self.make_csc(
+            initial_state=salobj.State.STANDBY,
+            config_dir=TEST_CONFIG_DIR,
+            simulation_mode=1,
+        ):
+            await salobj.set_summary_state(
+                self.remote, salobj.State.ENABLED, settingsToApply="t2sa_test.yaml"
             )
             await self.remote.cmd_measureTarget.set_start(target="M1M3", timeout=STD_TIMEOUT)
 

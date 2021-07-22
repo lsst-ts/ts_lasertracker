@@ -32,7 +32,7 @@ class AlignmentModel:
         self.simulation_mode = 0
         self.com_lock = asyncio.Lock()
 
-    async def connect(self):
+    async def connect(self, host, port):
         """
         Connect to the T2SA host. Spin up a fake one for simulation mode 2.
         """
@@ -40,12 +40,12 @@ class AlignmentModel:
             self.mock_t2sa = mockT2sa.MockT2SA(port=0)
             self.port = await asyncio.wait_for(self.mock_t2sa.start(), 5)
             self.reader, self.writer = await asyncio.open_connection("127.0.0.1", self.port)
-            self.log.debug(f"connected to mock T2SA at 127.0.0.1:{self.port}")
+            self.log.debug(f"connected to mock T2SA at 127.0.0.1:{port}")
         else:
-            self.log.debug(f"attempting to connect to real T2SA at {self.host}:{self.port}")
+            self.log.debug(f"attempting to connect to real T2SA at {host}:{port}")
             self.reader, self.writer = await asyncio.open_connection(
-                self.host,
-                self.port,
+                host,
+                port,
             )
         self.connected = True
 
@@ -71,7 +71,7 @@ class AlignmentModel:
                     self.log.debug("waiting for init")
                     await asyncio.sleep(5)
                 while stat in wait_states:
-                    await asyncio.sleep(0.3)
+                    await asyncio.sleep(0.5)
                     self.writer.write(msg)
                     await self.writer.drain()
                     data = await self.reader.read(64)
@@ -102,6 +102,7 @@ class AlignmentModel:
         async with self.com_lock:
             self.writer.write(msg)
             await self.writer.drain()
+            self.log.debug(f"sent {msg}")
             try:
                 data = await self.reader.readuntil(separator=bytes("\n", "ascii"))
             except(asyncio.IncompleteReadError, ConnectionResetError):

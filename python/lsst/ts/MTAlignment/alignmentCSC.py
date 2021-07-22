@@ -68,8 +68,8 @@ class AlignmentCSC(salobj.ConfigurableCsc):
                     log=self.log
                 )
                 self.model.simulation_mode = self.simulation_mode
-                await self.model.connect()
-                self.log.debug(f"mock t2sa is {self.model.host}:{self.model.port}")
+                await self.model.connect(self.config.t2sa_ip, self.config.t2sa_port)
+                self.log.debug(f"connected to t2sa at {self.model.host}:{self.model.port}")
         else:
             if self.model is not None:
                 await self.model.disconnect()
@@ -77,6 +77,10 @@ class AlignmentCSC(salobj.ConfigurableCsc):
 
     async def configure(self, config):
         self.config = config
+        if self.model is not None:
+            if self.model.connected:
+                await self.model.disconnect()
+            await self.model.connect(self.config.t2sa_ip, self.config.t2sa_port)
 
     @staticmethod
     async def get_config_pkg(self):
@@ -88,13 +92,16 @@ class AlignmentCSC(salobj.ConfigurableCsc):
         M1M3, M2, CAM, and DOME"""
         self.assert_enabled()
         if data.target == "CAM":
-            result = await self.model.measure_cam()
+            ack = await self.model.measure_cam()
+            result = await self.model.query_cam_position()
         elif data.target == "M2":
-            result = await self.model.measure_m2()
-        else:  # elif data.target == "M1M3":
+            ack = await self.model.measure_m2()
+            result = await self.model.query_m2_position()
+        elif data.target == "M1M3":
             self.log.debug("measure m1m3")
-            result = await self.model.measure_m1m3()
-        self.log.debug(result)
+            ack = await self.model.measure_m1m3()
+            result = await self.model.query_m1m3_position()
+        self.log.debug(result) # eventually we will publish an event with the measured coordinates
 
     async def do_align(self, data):
         """Perform correction loop"""

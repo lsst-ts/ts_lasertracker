@@ -15,7 +15,7 @@ properties:
   t2sa_ip:
     description: IP address of T2SA instance.
     type: string
-    default: "140.252.33.70"
+    default: "127.0.0.1"
   t2sa_port:
     description: port of T2SA instance.
     type: number

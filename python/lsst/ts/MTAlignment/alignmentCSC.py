@@ -58,6 +58,7 @@ class AlignmentCSC(salobj.ConfigurableCsc):
         self.azimuth = 0
         self.camrot = 0
         self.use_port_zero = use_port_zero
+        self.last_measurement = None
 
     async def handle_summary_state(self):
         if self.disabled_or_enabled:
@@ -92,16 +93,17 @@ class AlignmentCSC(salobj.ConfigurableCsc):
         M1M3, M2, CAM, and DOME"""
         self.assert_enabled()
         if data.target == "CAM":
-            ack = await self.model.measure_cam()
+            await self.model.measure_cam()
             result = await self.model.query_cam_position()
         elif data.target == "M2":
-            ack = await self.model.measure_m2()
+            await self.model.measure_m2()
             result = await self.model.query_m2_position()
         elif data.target == "M1M3":
             self.log.debug("measure m1m3")
-            ack = await self.model.measure_m1m3()
+            await self.model.measure_m1m3()
             result = await self.model.query_m1m3_position()
-        self.log.debug(result) # eventually we will publish an event with the measured coordinates
+        self.log.debug(self.parse_offsets(result))  # eventually we will publish an event with the measured 
+        self.last_measurement = self.parse_offsets(result)
 
     async def do_align(self, data):
         """Perform correction loop"""

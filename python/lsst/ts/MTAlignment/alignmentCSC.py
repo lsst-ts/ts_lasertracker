@@ -14,8 +14,7 @@ class AlignmentDetailedState(enum.IntEnum):
     STANDBY = 5
     MEASURING = 6
     TWOFACE_CHECK = 7
-    ADM_CHECK = 8
-    DRIFT_CHECK = 9
+    DRIFT_CHECK = 8
 
 
 class AlignmentCSC(salobj.ConfigurableCsc):
@@ -102,7 +101,7 @@ class AlignmentCSC(salobj.ConfigurableCsc):
             self.log.debug("measure m1m3")
             await self.model.measure_m1m3()
             result = await self.model.query_m1m3_position()
-        self.log.debug(self.parse_offsets(result))  # eventually we will publish an event with the measured 
+        self.log.debug(self.parse_offsets(result))  # TODO publish an event with the measured coords
         self.last_measurement = self.parse_offsets(result)
 
     async def do_align(self, data):
@@ -112,53 +111,76 @@ class AlignmentCSC(salobj.ConfigurableCsc):
     async def do_healthCheck(self, data):
         """run healthcheck script"""
         self.assert_enabled()
+        await self.model.twoFace_check()
+        await self.model.measure_drift()
 
     async def do_laserPower(self, data):
         """put the laser in sleep state"""
         self.assert_enabled()
+        if data.laserPower == 0:
+            await self.model.laser_off()
+        else:
+            await self.model.laser_on()
 
     async def do_powerOff(self, data):
         """full power off of tracker and interface"""
         self.assert_enabled()
+        await self.model.tracker_off()
 
     async def do_measurePoint(self, data):
         """measure and return coords of a specific point"""
         self.assert_enabled()
+        await self.model.measure_single_point(data.collection, data.pointgroup, data.target)
 
     async def do_pointDelta(self, data):
-        """return a vector between two points"""
+        """publish an event containing a vector between two points"""
         self.assert_enabled()
+        data = await self.model.query_point_delta(
+            data.collection_A,
+            data.pointgroup_A,
+            data.target_A,
+            data.collection_B,
+            data.pointgroup_B,
+            data.target_B
+        )
 
     async def do_setReferenceGroup(self, data):
         """Nominal point group to locate tracker station to and provide data
         relative to"""
         self.assert_enabled()
+        await self.model.set_reference_group(data.pointgroup)
 
     async def do_setWorkingFrame(self, data):
         """attempt to set the passed string as the SpatialAnalyzer working
         frame"""
         self.assert_enabled()
+        await self.model.set_working_frame(data.workingframe)
 
     async def do_halt(self, data):
         """halts any executing measurement plan and returns to ready state"""
         self.assert_enabled()
+        await self.model.halt()
 
     async def do_loadSATemplateFile(self, data):
         """SA Template file path and name. This is in the filesystem on the
         T2SA host."""
         self.assert_enabled()
+        await self.model.load_template_file(data.filepath)
 
     async def do_measureDrift(self, data):
         """measure tracker drift"""
         self.assert_enabled()
+        await self.model.measure_drift()
 
     async def do_resetT2SA(self, data):
         """reboots t2sa and SA"""
         self.assert_enabled()
+        await self.model.reset_t2sa()
 
     async def do_newStation(self, data):
         """create new tracker station"""
         self.assert_enabled()
+        await self.model.new_station()
 
     async def do_saveJobfile(self, data):
         """save job file"""

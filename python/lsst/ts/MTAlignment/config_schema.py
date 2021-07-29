@@ -46,12 +46,24 @@ properties:
     description: maximum absolute tolerance  in mm
     type: number
     default: 1.0
-  two_face_tolerance:
+  two_face_az_tolerance:
     description: >-
-      maximum allowed divergence when measuring the same point using the
+      maximum azimuth divergence allowed when measuring the same point using the
       tracker's two different "facings" in decimal degrees
     type: number
-    default: 0.001
+    default: 0.08
+  two_face_el_tolerance:
+    description: >-
+      maximum elevation divergence allowed when measuring the same point using the
+      tracker's two different "facings" in decimal degrees
+    type: number
+    default: 0.08
+  two_face_range_tolerance:
+    description: >-
+      maximum range divergence allowed when measuring the same point using the
+      tracker's two different "facings" in millimeters
+    type: number
+    default: 0.05
   rms_drift_tolerance:
     description: RMS least squares tolerance in mm
     type: number

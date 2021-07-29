@@ -61,7 +61,9 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             await self.remote.cmd_measureTarget.set_start(target="M1M3", timeout=STD_TIMEOUT)
             await self.tearDown()
 
-    async def test_measure(self):
+    async def test_measure_m2(self):
+        # TODO: T2SA should load a template file that approximates the real telescope
+        # so that we can make the simulated measurements produce real-ish results
         async with self.make_csc(
             initial_state=salobj.State.STANDBY,
             config_dir=TEST_CONFIG_DIR,
@@ -72,7 +74,35 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             )
             await self.remote.cmd_measureTarget.set_start(target="M2", timeout=STD_TIMEOUT)
             assert self.csc.last_measurement is not None
-            assert self.csc.last_measurement['Rx'] != 0 #  It's probably not gonna be zero, right?
+            assert self.csc.last_measurement['Rx'] != 0  # It's probably not gonna be zero, right?
+            await self.tearDown()
+
+    async def test_measure_cam(self):
+        async with self.make_csc(
+            initial_state=salobj.State.STANDBY,
+            config_dir=TEST_CONFIG_DIR,
+            simulation_mode=1,
+        ):
+            await salobj.set_summary_state(
+                self.remote, salobj.State.ENABLED, settingsToApply="t2sa_test.yaml"
+            )
+            await self.remote.cmd_measureTarget.set_start(target="CAM", timeout=STD_TIMEOUT)
+            assert self.csc.last_measurement is not None
+            assert self.csc.last_measurement['Rx'] != 0  # It's probably not gonna be zero, right?
+            await self.tearDown()
+
+    async def test_measure_m1m3(self):
+        async with self.make_csc(
+            initial_state=salobj.State.STANDBY,
+            config_dir=TEST_CONFIG_DIR,
+            simulation_mode=1,
+        ):
+            await salobj.set_summary_state(
+                self.remote, salobj.State.ENABLED, settingsToApply="t2sa_test.yaml"
+            )
+            await self.remote.cmd_measureTarget.set_start(target="M1M3", timeout=STD_TIMEOUT)
+            assert self.csc.last_measurement is not None
+            assert self.csc.last_measurement['Rx'] != 0  # It's probably not gonna be zero, right?
             await self.tearDown()
 
 

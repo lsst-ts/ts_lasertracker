@@ -95,6 +95,7 @@ class AlignmentModel:
         msg : `str`
             String message to send to T2SA controller.
         """
+        # TODO Implement timeouts on this
         msg = msg + "\r\n"
         if type(msg) == str:  # this may move
             msg = bytes(msg, "ascii")
@@ -169,6 +170,23 @@ class AlignmentModel:
         ACK300 or ERR code
         """
         data = await self.send_msg("!LST:0")
+        return data
+
+    async def set_simulation_mode(self, sim_mode):
+        if sim_mode:
+            data = await self.send_msg("!SET_SIM:1")
+        else:
+            data = await self.send_msg("!SET_SIM:0")
+
+    async def tracker_off(self):
+        """
+        Turns the whole tracker off, must be powered back on "manually"
+
+        Returns
+        -------
+        ACK300 or ERR code
+        """
+        data = await self.send_msg("!LST:2")
         return data
 
     async def measure_m2(self):
@@ -399,10 +417,12 @@ class AlignmentModel:
         ACK300 or ERR code
         """
 
-        if randomize_points:
+        if randomize_points == 1:
             msg = "SET_RANDOMIZE_POINTS:1"
-        else:
+        elif randomize_points == 0:
             msg = "SET_RANDOMIZE_POINTS:0"
+        else:
+            msg = "SET_RANDOMIZE_POINTS:" + str(randomize_points)
         data = await self.send_msg(msg)
         return data
 
@@ -521,21 +541,22 @@ class AlignmentModel:
         data = await self.send_msg(msg)
         return data
 
-    async def set_2face_tolerance(self, tolerance):
+    async def set_2face_tolerance(self, az_tol, el_tol, range_tol):
         """
         default tolerance is 0.001 dec deg
 
         Parameters
         ----------
-        tolerance : `float`
-            (TODO find out what the range is)
+        az_tol : `float` degrees
+        el_tol : `float` degrees 
+        range_tol : `float` millimeters
 
         Returns
         -------
         ACK300 or ERR code
         """
 
-        msg = "!SET_2FACE_TOL:" + tolerance
+        msg = f"!SET_2FACE_TOL:{az_tol};{el_tol};{range_tol}"
         data = await self.send_msg(msg)
         return data
 
@@ -737,7 +758,7 @@ class AlignmentModel:
         ACK300 or ERR code
         """
 
-        msg = f"PUBLISH_ALT_AZ_ROT:{telalt};{telaz};{camrot}"
+        msg = f"!PUBLISH_ALT_AZ_ROT:{telalt};{telaz};{camrot}"
         data = await self.send_msg(msg)
         return data
 
@@ -779,21 +800,39 @@ class AlignmentModel:
         data = await self.send_msg(msg)
         return data
 
-    async def increment_measured_index(self, idx):
+    async def increment_measured_index(self, inc=1):
         """
-        Increment to measured point group index by idx
+        Increment to measured point group index by inc
 
         Parameters
         ----------
-        idx : `Int`
-            Index
+        inc : `Int`
+            increment amount
 
         Returns
         -------
         ACK300 or ERR code
         """
 
-        msg = f"INC_MEAS_INDEX:{idx}"
+        msg = f"INC_MEAS_INDEX:{inc}"
+        data = await self.send_msg(msg)
+        return data
+
+    async def set_measured_index(self, idx):
+        """
+        Set measured point group index to idx
+
+        Parameters
+        ----------
+        idx : `Int`
+            index
+
+        Returns
+        -------
+        ACK300 or ERR code
+        """
+
+        msg = f"SET_MEAS_INDEX:{idx}"
         data = await self.send_msg(msg)
         return data
 

@@ -68,7 +68,9 @@ class AlignmentCSC(salobj.ConfigurableCsc):
                     log=self.log
                 )
                 self.model.simulation_mode = self.simulation_mode
-                await self.model.connect(self.config.t2sa_ip, self.config.t2sa_port)
+                self.model.port = self.config.t2sa_port
+                self.model.host = self.config.t2sa_ip
+                await self.model.connect()
                 self.log.debug(f"connected to t2sa at {self.model.host}:{self.model.port}")
         else:
             if self.model is not None:

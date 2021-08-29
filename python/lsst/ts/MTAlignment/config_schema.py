@@ -8,7 +8,7 @@ CONFIG_SCHEMA = yaml.safe_load(
 $schema: http://json-schema.org/draft-07/schema#
 $id: https://github.com/lsst-ts/ts_MTAlignment/blob/master/schema/alignment.yaml
 # title must end with one or more spaces followed by the schema version, which must begin with "v"
-title: Alignment v1
+title: Alignment v1.1
 description: Schema for MT Alignment CSC configuration files
 type: object
 properties:

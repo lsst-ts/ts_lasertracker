@@ -62,8 +62,6 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             await self.tearDown()
 
     async def test_measure_m2(self):
-        # TODO: T2SA should load a template file that approximates the real telescope
-        # so that we can make the simulated measurements produce real-ish results
         async with self.make_csc(
             initial_state=salobj.State.STANDBY,
             config_dir=TEST_CONFIG_DIR,

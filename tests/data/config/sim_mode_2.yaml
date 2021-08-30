@@ -1,5 +1,5 @@
 t2sa_ip: "127.0.0.1"
-t2sa_port: 50000
+t2sa_port: 0
 num_iterations: 1
 num_samples: 1
 randomize_points: false

@@ -8,14 +8,14 @@ CONFIG_SCHEMA = yaml.safe_load(
 $schema: http://json-schema.org/draft-07/schema#
 $id: https://github.com/lsst-ts/ts_MTAlignment/blob/master/schema/alignment.yaml
 # title must end with one or more spaces followed by the schema version, which must begin with "v"
-title: Alignment v1
+title: Alignment v1.1
 description: Schema for MT Alignment CSC configuration files
 type: object
 properties:
   t2sa_ip:
     description: IP address of T2SA instance.
     type: string
-    default: "140.252.33.70"
+    default: "127.0.0.1"
   t2sa_port:
     description: port of T2SA instance.
     type: number
@@ -46,12 +46,24 @@ properties:
     description: maximum absolute tolerance  in mm
     type: number
     default: 1.0
-  two_face_tolerance:
+  two_face_az_tolerance:
     description: >-
-      maximum allowed divergence when measuring the same point using the
+      maximum azimuth divergence allowed when measuring the same point using the
       tracker's two different "facings" in decimal degrees
     type: number
-    default: 0.001
+    default: 0.08
+  two_face_el_tolerance:
+    description: >-
+      maximum elevation divergence allowed when measuring the same point using the
+      tracker's two different "facings" in decimal degrees
+    type: number
+    default: 0.08
+  two_face_range_tolerance:
+    description: >-
+      maximum range divergence allowed when measuring the same point using the
+      tracker's two different "facings" in millimeters
+    type: number
+    default: 0.05
   rms_drift_tolerance:
     description: RMS least squares tolerance in mm
     type: number

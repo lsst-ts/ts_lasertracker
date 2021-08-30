@@ -10,7 +10,7 @@ class T2SAErrors(IntEnum):
 
     DriftCheckFailedToleranceCheck = 304
     MeasurementOfPointFailed = 305
-    DidFindOrSetPointGroupAndTargetName = 306
+    # DidNotFindOrSetPointGroupAndTargetName = 306
     RequestedMeasurementProfileDoesNotExist = 307
     SAReportTemplateNotFound = 308
 

@@ -27,6 +27,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             simulation_mode=2,
         ):
             await self.check_standard_state_transitions(
+                settingsToApply="sim_mode_2.yaml",
                 enabled_commands=[
                     "align",
                     "measureTarget",
@@ -53,7 +54,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             simulation_mode=2,
         ):
             await salobj.set_summary_state(
-                self.remote, salobj.State.ENABLED, settingsToApply="t2sa_test.yaml"
+                self.remote, salobj.State.ENABLED, settingsToApply="sim_mode_2.yaml"
             )
             await self.remote.cmd_measureTarget.set_start(target="M1M3", timeout=STD_TIMEOUT)
 

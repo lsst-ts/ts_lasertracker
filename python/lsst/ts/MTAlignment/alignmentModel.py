@@ -49,6 +49,7 @@ class AlignmentModel:
                 self.host,
                 self.port,
             )
+        t2sa_listener_task = asyncio.create_task(self.t2sa_listener())
         self.connected = True
 
     async def disconnect(self):
@@ -88,6 +89,17 @@ class AlignmentModel:
         """
         pass
 
+    async def t2sa_listener(self):
+        """ Listening Loop for TCP messages from T2SA
+        """
+        while True:
+            try:
+                data = await self.reader.readuntil(separator=bytes("\n", "ascii"))
+            except(asyncio.IncompleteReadError, ConnectionResetError):
+                await self.handle_lost_connection()
+            self.log.debug(f"T2SA: {data.decode()!r}")
+
+
     async def send_msg(self, msg):
         """
         Formats and sends a message to T2SA.
@@ -105,12 +117,6 @@ class AlignmentModel:
             self.writer.write(msg)
             await self.writer.drain()
             self.log.debug(f"sent {msg}")
-            try:
-                data = asyncio.wait_for(self.reader.readuntil(separator=bytes("\n", "ascii")), self.timeout)
-            except(asyncio.IncompleteReadError, ConnectionResetError):
-                await self.handle_lost_connection()
-            self.log.debug(f"Received: {data.decode()!r}")
-        return data.decode()
 
     async def check_status(self):
         """
@@ -123,7 +129,8 @@ class AlignmentModel:
         EMP if executing measurement plan
         ERR-xxx if there is an error with error code xxx
         """
-        return await self.send_msg("?STAT")
+        await self.send_msg("?STAT")
+
 
     async def send_string(self, message):
         """
@@ -134,7 +141,7 @@ class AlignmentModel:
         message : `str`
             characters to send to T2SA.
         """
-        return await self.send_msg(message)
+        await self.send_msg(message)
 
     async def laser_status(self):
         """
@@ -146,7 +153,7 @@ class AlignmentModel:
         ERR-xxx if there is an error with error code xxx
         """
 
-        return await self.send_msg("?LSTA")
+        await self.send_msg("?LSTA")
 
     async def laser_on(self):
         """
@@ -156,7 +163,7 @@ class AlignmentModel:
         -------
         ACK300 or ERR code
         """
-        return await self.send_msg("!LST:1")
+        await self.send_msg("!LST:1")
 
     async def laser_off(self):
         """
@@ -166,13 +173,13 @@ class AlignmentModel:
         -------
         ACK300 or ERR code
         """
-        return await self.send_msg("!LST:0")
+        await self.send_msg("!LST:0")
 
     async def set_simulation_mode(self, sim_mode):
         if sim_mode:
-            return await self.send_msg("!SET_SIM:1")
+            await self.send_msg("!SET_SIM:1")
         else:
-            return await self.send_msg("!SET_SIM:0")
+            await self.send_msg("!SET_SIM:0")
 
     async def tracker_off(self):
         """
@@ -182,7 +189,7 @@ class AlignmentModel:
         -------
         ACK300 or ERR code
         """
-        return await self.send_msg("!LST:2")
+        await self.send_msg("!LST:2")
 
     async def measure_m2(self):
         """
@@ -196,7 +203,7 @@ class AlignmentModel:
         msg = "!CMDEXE:M2"
         self.log.debug(f"waiting for ready before sending {msg}")
         await self.wait_for_ready()
-        return await self.send_msg(msg)
+        await self.send_msg(msg)
 
     async def measure_m1m3(self):
         """
@@ -210,7 +217,7 @@ class AlignmentModel:
         msg = "!CMDEXE:M1M3"
         self.log.debug(f"waiting for ready before sending {msg}")
         await self.wait_for_ready()
-        return await self.send_msg(msg)
+        await self.send_msg(msg)
 
     async def measure_cam(self):
         """
@@ -229,7 +236,7 @@ class AlignmentModel:
         msg = "!CMDEXE:CAM"
         self.log.debug(f"waiting for ready before sending {msg}")
         await self.wait_for_ready()
-        return await self.send_msg(msg)
+        await self.send_msg(msg)
 
     async def query_m2_position(self):
         """
@@ -243,7 +250,7 @@ class AlignmentModel:
 
         self.log.debug("query m2")
         msg = "?POS M2"
-        return await self.send_msg(msg)
+        await self.send_msg(msg)
 
     async def query_m1m3_position(self):
         """
@@ -257,7 +264,7 @@ class AlignmentModel:
 
         self.log.debug("query m1m3")
         msg = "?POS M1M3"
-        return await self.send_msg(msg)
+        await self.send_msg(msg)
 
     async def query_cam_position(self):
         """
@@ -271,7 +278,7 @@ class AlignmentModel:
 
         self.log.debug("query cam")
         msg = "?POS CAM"
-        return await self.send_msg(msg)
+        await self.send_msg(msg)
 
     async def query_point_position(self, pointgroup, point, collection="A"):
         """
@@ -291,7 +298,7 @@ class AlignmentModel:
         Point Coordiante String
         """
         msg = f"?POINT_POS:{collection};{pointgroup};{point}"
-        return await self.send_msg(msg)
+        await self.send_msg(msg)
 
     async def query_m2_offset(self, refPtGrp="M1M3"):
         """
@@ -309,7 +316,7 @@ class AlignmentModel:
         """
 
         msg = "?OFFSET:" + refPtGrp + ";M2"
-        return await self.send_msg(msg)
+        await self.send_msg(msg)
 
     async def query_m1m3_offset(self, refPtGrp="M1M3"):
         """
@@ -327,7 +334,7 @@ class AlignmentModel:
         """
 
         msg = "?OFFSET:" + refPtGrp + ";M1M3"
-        return await self.send_msg(msg)
+        await self.send_msg(msg)
 
     async def query_cam_offset(self, refPtGrp="M1M3"):
         """
@@ -345,7 +352,7 @@ class AlignmentModel:
         """
 
         msg = "?OFFSET:" + refPtGrp + ";CAM"
-        return await self.send_msg(msg)
+        await self.send_msg(msg)
 
     async def query_point_delta(
         self, p1group, p1, p2group, p2, p1collection="A", p2collection="A"
@@ -375,7 +382,7 @@ class AlignmentModel:
         msg = (
             f"?POINT_DELTA:{p1collection};{p1group};{p1};{p2collection};{p2group};{p2}"
         )
-        return await self.send_msg(msg)
+        await self.send_msg(msg)
 
     async def clear_errors(self):
         """
@@ -384,7 +391,7 @@ class AlignmentModel:
         """
 
         msg = "!CLERCL"
-        return await self.send_msg(msg)
+        await self.send_msg(msg)
 
     async def set_randomize_points(self, randomize_points):
         """
@@ -406,7 +413,7 @@ class AlignmentModel:
             msg = "SET_RANDOMIZE_POINTS:0"
         else:
             msg = "SET_RANDOMIZE_POINTS:" + str(randomize_points)
-        return await self.send_msg(msg)
+        await self.send_msg(msg)
 
     async def set_power_lock(self, power_lock):
         """
@@ -427,7 +434,7 @@ class AlignmentModel:
             msg = "SET_POWER_LOCK:1"
         else:
             msg = "SET_POWER_LOCK:0"
-        return await self.send_msg(msg)
+        await self.send_msg(msg)
 
     async def twoFace_check(self, pointgroup):
         """
@@ -444,7 +451,7 @@ class AlignmentModel:
         """
 
         msg = "!2FACE_CHECK:" + pointgroup
-        return await self.send_msg(msg)
+        await self.send_msg(msg)
 
     async def measure_drift(self, pointgroup):
         """
@@ -461,7 +468,7 @@ class AlignmentModel:
         """
 
         msg = "!MEAS_DRIFT:" + pointgroup
-        return await self.send_msg(msg)
+        await self.send_msg(msg)
 
     async def measure_single_point(self, collection, pointgroup, target):
         """
@@ -481,7 +488,7 @@ class AlignmentModel:
         """
 
         msg = f"!MEAS_SINGLE_POINT:{collection};{pointgroup};{target}"
-        return await self.send_msg(msg)
+        await self.send_msg(msg)
 
     async def single_point_measurement_profile(self, profile):
         """
@@ -498,7 +505,7 @@ class AlignmentModel:
         """
 
         msg = "!SINGLE_POINT_MEAS_PROFILE:" + profile
-        return await self.send_msg(msg)
+        await self.send_msg(msg)
 
     async def generate_report(self, reportname):
         """
@@ -515,7 +522,7 @@ class AlignmentModel:
         """
 
         msg = "!GEN_REPORT:" + reportname
-        return await self.send_msg(msg)
+        await self.send_msg(msg)
 
     async def set_2face_tolerance(self, az_tol, el_tol, range_tol):
         """
@@ -533,7 +540,7 @@ class AlignmentModel:
         """
 
         msg = f"!SET_2FACE_TOL:{az_tol};{el_tol};{range_tol}"
-        return await self.send_msg(msg)
+        await self.send_msg(msg)
 
     async def set_drift_tolerance(self, rms_tol, max_tol):
         """
@@ -553,7 +560,7 @@ class AlignmentModel:
         """
 
         msg = f"!SET_DRIFT_TOL:{rms_tol};{max_tol}"
-        return await self.send_msg(msg)
+        await self.send_msg(msg)
 
     async def set_ls_tolerance(self, rms_tol, max_tol):
         """
@@ -572,7 +579,7 @@ class AlignmentModel:
         """
 
         msg = f"!SET_LS_TOL:{rms_tol};{max_tol}"
-        return await self.send_msg(msg)
+        await self.send_msg(msg)
 
     async def load_template_file(self, filepath):
         """
@@ -589,7 +596,7 @@ class AlignmentModel:
         """
 
         msg = "!LOAD_SA_TEMPLATE_FILE;" + filepath
-        return await self.send_msg(msg)
+        await self.send_msg(msg)
 
     async def set_reference_group(self, pointgroup):
         """
@@ -607,7 +614,7 @@ class AlignmentModel:
         """
 
         msg = "!SET_REFERENCE_GROUP:" + pointgroup
-        return await self.send_msg(msg)
+        await self.send_msg(msg)
 
     async def set_working_frame(self, workingframe):
         """
@@ -626,7 +633,7 @@ class AlignmentModel:
         """
 
         msg = "!SET_WORKING_FRAME:" + workingframe
-        return await self.send_msg(msg)
+        await self.send_msg(msg)
 
     async def new_station(self):
         """
@@ -638,7 +645,7 @@ class AlignmentModel:
         """
 
         msg = "!NEW_STATION"
-        return await self.send_msg(msg)
+        await self.send_msg(msg)
 
     async def save_sa_jobfile(self, filepath):
         """
@@ -655,7 +662,7 @@ class AlignmentModel:
         """
 
         msg = "!SAVE_SA_JOBFILE;" + filepath
-        return await self.send_msg(msg)
+        await self.send_msg(msg)
 
     async def set_station_lock(self, station_locked):
         """
@@ -675,7 +682,7 @@ class AlignmentModel:
             msg = "!SET_STATION_LOCK:1"
         else:
             msg = "!SET_STATION_LOCK:0"
-        return await self.send_msg(msg)
+        await self.send_msg(msg)
 
     async def reset_t2sa(self):
         """
@@ -687,7 +694,7 @@ class AlignmentModel:
         """
 
         msg = "!RESET_T2SA"
-        return await self.send_msg(msg)
+        await self.send_msg(msg)
 
     async def halt(self):
         """
@@ -700,7 +707,7 @@ class AlignmentModel:
         """
 
         msg = "!HALT"
-        return await self.send_msg(msg)
+        await self.send_msg(msg)
 
     async def set_telescope_position(self, telalt, telaz, camrot):
         """
@@ -723,7 +730,7 @@ class AlignmentModel:
         """
 
         msg = f"!PUBLISH_ALT_AZ_ROT:{telalt};{telaz};{camrot}"
-        return await self.send_msg(msg)
+        await self.send_msg(msg)
 
     async def set_num_samples(self, numsamples):
         """
@@ -741,7 +748,7 @@ class AlignmentModel:
         """
 
         msg = f"SET_NUM_SAMPLES:{numsamples}"
-        return await self.send_msg(msg)
+        await self.send_msg(msg)
 
     async def set_num_iterations(self, numiters):
         """
@@ -759,7 +766,7 @@ class AlignmentModel:
         """
 
         msg = f"SET_NUM_ITERATIONS:{numiters}"
-        return await self.send_msg(msg)
+        await self.send_msg(msg)
 
     async def increment_measured_index(self, inc=1):
         """
@@ -776,7 +783,7 @@ class AlignmentModel:
         """
 
         msg = f"INC_MEAS_INDEX:{inc}"
-        return await self.send_msg(msg)
+        await self.send_msg(msg)
 
     async def set_measured_index(self, idx):
         """
@@ -793,7 +800,7 @@ class AlignmentModel:
         """
 
         msg = f"SET_MEAS_INDEX:{idx}"
-        return await self.send_msg(msg)
+        await self.send_msg(msg)
 
     async def save_settings(self):
         """
@@ -808,7 +815,7 @@ class AlignmentModel:
         """
 
         msg = "!SAVE_SETTINGS"
-        return await self.send_msg(msg)
+        await self.send_msg(msg)
 
     async def load_tracker_compensation(self, compfile):
         """
@@ -825,4 +832,4 @@ class AlignmentModel:
         """
 
         msg = "!LOAD_TRACKER_COMPENSATION:" + compfile
-        return await self.send_msg(msg)
+        await self.send_msg(msg)

@@ -120,7 +120,6 @@ class AlignmentModel:
             self.writer.write(msg)
             await self.writer.drain()
             self.log.debug(f"sent {msg}")
-<<<<<<< HEAD
             try:
                 data = await asyncio.wait_for(
                     self.reader.readuntil(separator=bytes("\n", "ascii")),
@@ -130,8 +129,6 @@ class AlignmentModel:
                 await self.handle_lost_connection()
             self.log.debug(f"Received: {data.decode()!r}")
         return data.decode()
-=======
->>>>>>> 57c1d342e0bb0362ca35c35c6f6813be9bf24c1e
 
     async def check_status(self):
         """

@@ -44,7 +44,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                     "resetT2SA",
                     "newStation",
                     "saveJobfile",
-                ]
+                ],
             )
 
     async def test_basics(self):
@@ -56,7 +56,9 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             await salobj.set_summary_state(
                 self.remote, salobj.State.ENABLED, settingsToApply="sim_mode_2.yaml"
             )
-            await self.remote.cmd_measureTarget.set_start(target="M1M3", timeout=STD_TIMEOUT)
+            await self.remote.cmd_measureTarget.set_start(
+                target="M1M3", timeout=STD_TIMEOUT
+            )
 
 
 if __name__ == "__main__":

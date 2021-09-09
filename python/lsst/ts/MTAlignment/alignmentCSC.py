@@ -35,7 +35,11 @@ class AlignmentCSC(salobj.ConfigurableCsc):
     """
 
     def __init__(
-        self, config_dir=None, initial_state=salobj.State.STANDBY, simulation_mode=0, use_port_zero=False
+        self,
+        config_dir=None,
+        initial_state=salobj.State.STANDBY,
+        simulation_mode=0,
+        use_port_zero=False,
     ):
         super().__init__(
             "MTAlignment",
@@ -63,15 +67,15 @@ class AlignmentCSC(salobj.ConfigurableCsc):
         if self.disabled_or_enabled:
             if self.model is None:
                 self.model = AlignmentModel(
-                    self.config.t2sa_ip,
-                    self.config.t2sa_port,
-                    log=self.log
+                    self.config.t2sa_ip, self.config.t2sa_port, log=self.log
                 )
                 self.model.simulation_mode = self.simulation_mode
                 self.model.port = self.config.t2sa_port
                 self.model.host = self.config.t2sa_ip
                 await self.model.connect()
-                self.log.debug(f"connected to t2sa at {self.model.host}:{self.model.port}")
+                self.log.debug(
+                    f"connected to t2sa at {self.model.host}:{self.model.port}"
+                )
         else:
             if self.model is not None:
                 await self.model.disconnect()
@@ -103,7 +107,9 @@ class AlignmentCSC(salobj.ConfigurableCsc):
             self.log.debug("measure m1m3")
             await self.model.measure_m1m3()
             result = await self.model.query_m1m3_position()
-        self.log.debug(self.parse_offsets(result))  # TODO publish an event with the measured coords
+        self.log.debug(
+            self.parse_offsets(result)
+        )  # TODO publish an event with the measured coords
         self.last_measurement = self.parse_offsets(result)
 
     async def do_align(self, data):
@@ -132,7 +138,9 @@ class AlignmentCSC(salobj.ConfigurableCsc):
     async def do_measurePoint(self, data):
         """measure and return coords of a specific point"""
         self.assert_enabled()
-        await self.model.measure_single_point(data.collection, data.pointgroup, data.target)
+        await self.model.measure_single_point(
+            data.collection, data.pointgroup, data.target
+        )
 
     async def do_pointDelta(self, data):
         """publish an event containing a vector between two points"""
@@ -143,7 +151,7 @@ class AlignmentCSC(salobj.ConfigurableCsc):
             data.target_A,
             data.collection_B,
             data.pointgroup_B,
-            data.target_B
+            data.target_B,
         )
 
     async def do_setReferenceGroup(self, data):
@@ -242,7 +250,9 @@ class AlignmentCSC(salobj.ConfigurableCsc):
             # timestamp
             coordsDict["Timestamp"] = f"{bits[7][0]}:{bits[7][1]}:{bits[7][2]}"
         except ValueError or IndexError:
-            raise Exception(f"Failed to parse coordinates string '{t2sa_string}' received from T2SA.")
+            raise Exception(
+                f"Failed to parse coordinates string '{t2sa_string}' received from T2SA."
+            )
         return coordsDict
 
     def in_tolerance(self, coords):

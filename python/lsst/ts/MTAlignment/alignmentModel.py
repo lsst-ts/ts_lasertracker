@@ -93,16 +93,6 @@ class AlignmentModel:
         """Called when a connection is closed unexpectedly"""
         pass
 
-    async def t2sa_listener(self):
-        """ Listening Loop for TCP messages from T2SA
-        """
-        while True:
-            try:
-                data = await self.reader.readuntil(separator=bytes("\n", "ascii"))
-            except(asyncio.IncompleteReadError, ConnectionResetError):
-                await self.handle_lost_connection()
-            self.log.debug(f"T2SA: {data.decode()!r}")
-
     async def send_msg(self, msg):
         """
         Formats and sends a message to T2SA.

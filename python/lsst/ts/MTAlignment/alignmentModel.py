@@ -41,14 +41,20 @@ class AlignmentModel:
         if self.simulation_mode == 2:
             self.mock_t2sa = mockT2sa.MockT2SA(port=0)
             self.port = await asyncio.wait_for(self.mock_t2sa.start(), 5)
-            self.reader, self.writer = await asyncio.open_connection(self.mock_t2sa_ip, self.port)
+            self.reader, self.writer = await asyncio.open_connection(
+                self.mock_t2sa_ip, self.port
+            )
             self.log.debug(f"connected to mock T2SA at {self.mock_t2sa_ip}:{self.port}")
+            await self.set_simulation_mode(1) # make sure T2SA is also in sim mode
         else:
-            self.log.debug(f"attempting to connect to real T2SA at {self.host}:{self.port}")
+            self.log.debug(
+                f"attempting to connect to real T2SA at {self.host}:{self.port}"
+            )
             self.reader, self.writer = await asyncio.open_connection(
                 self.host,
                 self.port,
             )
+            await self.set_simulation_mode(0)
         self.connected = True
 
     async def disconnect(self):
@@ -78,14 +84,13 @@ class AlignmentModel:
                     await self.writer.drain()
                     data = await self.reader.read(64)
                     stat = data.decode()
-            except(asyncio.IncompleteReadError, ConnectionResetError):
+            except (asyncio.IncompleteReadError, ConnectionResetError):
                 self.handle_lost_connection()
 
             await asyncio.sleep(0.5)
 
     async def handle_lost_connection(self):
-        """ Called when a connection is closed unexpectedly
-        """
+        """Called when a connection is closed unexpectedly"""
         pass
 
     async def send_msg(self, msg):
@@ -106,8 +111,11 @@ class AlignmentModel:
             await self.writer.drain()
             self.log.debug(f"sent {msg}")
             try:
-                data = asyncio.wait_for(self.reader.readuntil(separator=bytes("\n", "ascii")), self.timeout)
-            except(asyncio.IncompleteReadError, ConnectionResetError):
+                data = await asyncio.wait_for(
+                    self.reader.readuntil(separator=bytes("\n", "ascii")),
+                    timeout=self.timeout,
+                )
+            except (asyncio.IncompleteReadError, ConnectionResetError):
                 await self.handle_lost_connection()
             self.log.debug(f"Received: {data.decode()!r}")
         return data.decode()
@@ -146,7 +154,7 @@ class AlignmentModel:
         ERR-xxx if there is an error with error code xxx
         """
 
-        return await self.send_msg("?LSTA")
+        await self.send_msg("?LSTA")
 
     async def laser_on(self):
         """
@@ -166,7 +174,7 @@ class AlignmentModel:
         -------
         ACK300 or ERR code
         """
-        return await self.send_msg("!LST:0")
+        await self.send_msg("!LST:0")
 
     async def set_simulation_mode(self, sim_mode):
         if sim_mode:

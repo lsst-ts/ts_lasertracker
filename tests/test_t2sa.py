@@ -45,7 +45,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                     "resetT2SA",
                     "newStation",
                     "saveJobfile",
-                ]
+                ],
             )
             await self.tearDown()
 
@@ -58,7 +58,9 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             await salobj.set_summary_state(
                 self.remote, salobj.State.ENABLED, settingsToApply="t2sa_test.yaml"
             )
-            await self.remote.cmd_measureTarget.set_start(target="M1M3", timeout=STD_TIMEOUT)
+            await self.remote.cmd_measureTarget.set_start(
+                target="M1M3", timeout=STD_TIMEOUT
+            )
             await self.tearDown()
 
     async def test_measure_m2(self):
@@ -70,9 +72,13 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             await salobj.set_summary_state(
                 self.remote, salobj.State.ENABLED, settingsToApply="t2sa_test.yaml"
             )
-            await self.remote.cmd_measureTarget.set_start(target="M2", timeout=STD_TIMEOUT)
+            await self.remote.cmd_measureTarget.set_start(
+                target="M2", timeout=STD_TIMEOUT
+            )
             assert self.csc.last_measurement is not None
-            assert self.csc.last_measurement['Rx'] != 0  # It's probably not gonna be zero, right?
+            assert (
+                self.csc.last_measurement["Rx"] != 0
+            )  # It's probably not gonna be zero, right?
             await self.tearDown()
 
     async def test_measure_cam(self):
@@ -84,9 +90,13 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             await salobj.set_summary_state(
                 self.remote, salobj.State.ENABLED, settingsToApply="t2sa_test.yaml"
             )
-            await self.remote.cmd_measureTarget.set_start(target="CAM", timeout=STD_TIMEOUT)
+            await self.remote.cmd_measureTarget.set_start(
+                target="CAM", timeout=STD_TIMEOUT
+            )
             assert self.csc.last_measurement is not None
-            assert self.csc.last_measurement['Rx'] != 0  # It's probably not gonna be zero, right?
+            assert (
+                self.csc.last_measurement["Rx"] != 0
+            )  # It's probably not gonna be zero, right?
             await self.tearDown()
 
     async def test_measure_m1m3(self):
@@ -98,9 +108,13 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             await salobj.set_summary_state(
                 self.remote, salobj.State.ENABLED, settingsToApply="t2sa_test.yaml"
             )
-            await self.remote.cmd_measureTarget.set_start(target="M1M3", timeout=STD_TIMEOUT)
+            await self.remote.cmd_measureTarget.set_start(
+                target="M1M3", timeout=STD_TIMEOUT
+            )
             assert self.csc.last_measurement is not None
-            assert self.csc.last_measurement['Rx'] != 0  # It's probably not gonna be zero, right?
+            assert (
+                self.csc.last_measurement["Rx"] != 0
+            )  # It's probably not gonna be zero, right?
             await self.tearDown()
 
 

@@ -1,5 +1,5 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 import asyncio
-from lsst.ts import asc
+from lsst.ts import MTAlignment
 
-asyncio.run(asc.AlignmentCSC.amain(index=None))
+asyncio.run(MTAlignment.AlignmentCSC.amain(index=None))

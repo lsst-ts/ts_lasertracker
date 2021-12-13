@@ -45,7 +45,7 @@ class AlignmentModel:
                 self.mock_t2sa_ip, self.port
             )
             self.log.debug(f"connected to mock T2SA at {self.mock_t2sa_ip}:{self.port}")
-            await self.set_simulation_mode(1) # make sure T2SA is also in sim mode
+            await self.set_simulation_mode(1)  # make sure T2SA is also in sim mode
         else:
             self.log.debug(
                 f"attempting to connect to real T2SA at {self.host}:{self.port}"

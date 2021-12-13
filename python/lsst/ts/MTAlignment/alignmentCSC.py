@@ -89,7 +89,7 @@ class AlignmentCSC(salobj.ConfigurableCsc):
             await self.model.connect(self.config.t2sa_ip, self.config.t2sa_port)
 
     @staticmethod
-    async def get_config_pkg(self):
+    def get_config_pkg():
         return "ts_config_mttcs"
 
     async def do_measureTarget(self, data):

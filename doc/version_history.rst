@@ -6,11 +6,17 @@
 Version History
 ###############
 
-This is release 4.6.0 of the MTAlignment CSC SDK (December 10th 2021)
----------------------------------------------------------------------
+v5.0
+----
 
-Changes for 4.6.0
-=================
+* Updated for ts_salobj 7.
+* Added preliminary documentation, including this version history.
+* Add a continuous integration Jenkinsfile.
+* Build with pyproject.toml
+* Add pre-commit support.
+
+v4.6.0
+---------
 
 * Change from "asc" to "MTAlignment"
 

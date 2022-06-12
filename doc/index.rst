@@ -1,41 +1,72 @@
-.. py:currentmodule:: lsst.ts.MTAlignment
+.. py:currentmodule:: lsst.ts.mtalignment
 
-.. _lsst.ts.MTAlignment:
+.. _lsst.ts.mtalignment:
 
 ###################
-lsst.ts.MTAlignment
+lsst.ts.mtalignment
 ###################
 
-.. Paragraph that describes what this Python module does and links to related modules and frameworks.
+.. image:: https://img.shields.io/badge/Project Metadata-gray.svg
+    :target: https://ts-xml.lsst.io/index.html#index-master-csc-table-mtalignment
+.. image:: https://img.shields.io/badge/SAL\ Interface-gray.svg
+    :target: https://ts-xml.lsst.io/sal_interfaces/MTAlignment.html
+.. image:: https://img.shields.io/badge/GitHub-gray.svg
+    :target: https://github.com/lsst-ts/ts_MTAlignment
+.. image:: https://img.shields.io/badge/Jira-gray.svg
+    :target: https://jira.lsstcorp.org/issues/?jql=labels+%3D+ts_MTAlignment
 
-.. .. _lsst.ts.MTAlignment-using:
+Overview
+========
 
-.. Using lsst.ts.MTAlignment
-.. =========================
+The MTAlignment CSC New River Kinematics T2SA laser alignment system.
 
-.. toctree linking to topics related to using the module's APIs.
+User Guide
+==========
 
-.. .. toctree::
-..    :maxdepth: 1
+Start the MTAlignment CSC
+-------------------------
 
-.. _lsst.ts.MTAlignment-contributing:
+.. prompt:: bash
 
-Contributing
-============
+    run_mtalignment
 
-``lsst.ts.MTAlignment`` is developed at https://github.com/lsst-ts/ts_MTAlignment.
-You can find Jira issues for this module under the `ts_MTAlignment <https://jira.lsstcorp.org/issues/?jql=project%3DDM%20AND%20component%3Dts_MTAlignment>`_ component.
+.. _lsst.ts.mtalignment.configuration:
 
-.. If there are topics related to developing this module (rather than using it), link to this from a toctree placed here.
+Configuration
+-------------
 
-.. .. toctree::
-..    :maxdepth: 1
+Configuration is specified in `ts_config_mttcs <https://github.com/lsst-ts/ts_config_mttcs>`_ following `this schema <https://github.com/lsst-ts/ts_MTAlignment/blob/develop/python/lsst/ts/MTAlignment/config_schema.py>`_.
 
-.. _lsst.ts.MTAlignment-pyapi:
+Simulator
+---------
 
-Python API reference
-====================
+The CSC includes two simulation modes:
 
-.. automodapi:: lsst.ts.MTAlignment
-   :no-main-docstr:
-   :no-inheritance-diagram:
+* 1: Run the spatial analyzer in simulation mode.
+     This requires a TCP/IP connection to the T2SA.
+
+* 2: Simple internal simulator.
+     This requires no TCP/IP collection but is very simplistic,
+     with no data analysis and canned responses to some queries.
+
+To run using CSC's internal simulator:
+
+.. prompt:: bash
+
+    run_mtalignment --simulate={mode}
+
+.. _lsst.ts.mtalignment.enable_with_eui:
+
+Developer Guide
+===============
+
+.. toctree::
+    developer_guide
+    :maxdepth: 1
+
+Version History
+===============
+
+.. toctree::
+    version_history
+    :maxdepth: 1

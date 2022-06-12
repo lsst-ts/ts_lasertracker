@@ -2,6 +2,4 @@
 ts_MTAlignment
 ##############
 
-
-
-.. Add a brief (few sentence) description of what this package provides.
+CSC to control a New River Kinematics T2SA laser alignment system

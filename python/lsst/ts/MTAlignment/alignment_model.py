@@ -1,7 +1,7 @@
 import asyncio
 from enum import IntEnum
 import logging
-from lsst.ts.MTAlignment import mockT2sa
+from .mock_t2sa import MockT2SA
 from lsst.ts import tcpip
 
 
@@ -21,7 +21,7 @@ class TrackerStatus(IntEnum):
 
 
 class AlignmentModel:
-    def __init__(self, host, port, log=logging.getLogger()):
+    def __init__(self, host, port, simulation_mode=0, log=logging.getLogger()):
         self.host = host
         self.port = port
         self.log = log
@@ -29,21 +29,24 @@ class AlignmentModel:
         self.reader = None
         self.writer = None
         self.first_measurement = True
-        self.simulation_mode = 0
-        self.com_lock = asyncio.Lock()
+        self.simulation_mode = simulation_mode
+        self.comm_lock = asyncio.Lock()
         self.mock_t2sa_ip = "127.0.0.1"
         self.timeout = 10
 
     async def connect(self):
-        """
-        Connect to the T2SA host. Spin up a fake one for simulation mode 2.
+        """Connect to the T2SA.
+
+        Create a mock T2SA for simulation mode 2.
         """
         if self.simulation_mode == 2:
-            self.mock_t2sa = mockT2sa.MockT2SA(port=0)
-            self.port = await asyncio.wait_for(self.mock_t2sa.start(), 5)
+            self.mock_t2sa = MockT2SA(port=0, log=self.log)
+            await self.mock_t2sa.start_task
+            self.port = self.mock_t2sa.port
             self.reader, self.writer = await asyncio.open_connection(
                 self.mock_t2sa_ip, self.port
             )
+            print(f"connected to mock T2SA at {self.mock_t2sa_ip}:{self.port}")
             self.log.debug(f"connected to mock T2SA at {self.mock_t2sa_ip}:{self.port}")
             await self.set_simulation_mode(1)  # make sure T2SA is also in sim mode
         else:
@@ -62,63 +65,95 @@ class AlignmentModel:
         self.connected = False
 
     async def wait_for_ready(self):
-        """
-        Checks to see if the tracker is executing a measurement plan.
-        If so, hold on to control until we start getting a ready signal
-        from the tracker. This is likely to be deprecated later.
-        """
-        async with self.com_lock:
-            wait_states = "EMP\r\n"
-            msg = bytes("?STAT\r\n", "ascii")
-            self.writer.write(msg)
-            await self.writer.drain()
-            try:
-                data = await self.reader.read(64)
-                stat = data.decode()
-                if stat == "INIT" or stat == "INIT\r\n":
-                    self.log.debug("waiting for init")
-                    await asyncio.sleep(5)
-                while stat in wait_states:
-                    await asyncio.sleep(0.5)
-                    self.writer.write(msg)
-                    await self.writer.drain()
-                    data = await self.reader.read(64)
-                    stat = data.decode()
-            except (asyncio.IncompleteReadError, ConnectionResetError):
-                self.handle_lost_connection()
+        """Wait for the tracker to report ready.
 
+        You must obtain self.comm_lock before calling this.
+
+        Check to see if the tracker is executing a measurement plan.
+        If so, hold on to the communication lock until we get a ready signal
+        from the tracker. This is likely to be deprecated later.
+
+        Raises
+        ------
+        RuntimeError
+            If self.comm_lock is not locked.
+            If a reply other than "EMP" (measuring) or "READY" is seen.
+        """
+        while True:
+            reply = await self._basic_send_command("?STAT")
+            # Apparently we need to wait an extra 0.5 seconds
+            # even if the tracker reports ready.
+            # If that is false, move this line to the end of the while block
             await asyncio.sleep(0.5)
+            if reply == "READY":
+                return
+            elif reply != "EMP":
+                raise RuntimeError("Unrecognized reply {reply!r}")
 
     async def handle_lost_connection(self):
-        """Called when a connection is closed unexpectedly"""
-        pass
+        """Handle a connection that is unexpectedly lost."""
+        if self.writer is not None:
+            await tcpip.close_stream_writer(self.writer)
 
-    async def send_msg(self, msg):
-        """
-        Formats and sends a message to T2SA.
+    async def send_command(self, cmd, wait_for_ready=False):
+        """Send a command and return the reply.
 
         Parameters
         ----------
-        msg : `str`
+        cmd : `str`
             String message to send to T2SA controller.
+        wait_for_ready : `bool`
+            If True, wait for the T2SA to be ready before issuing the command.
+
+        Returns
+        -------
+        reply : `str`
+            The reply, with trailing "\r\n" stripped.
         """
-        msg = msg + "\r\n"
-        if type(msg) == str:  # this may move
-            msg = bytes(msg, "ascii")
-        self.log.debug(f"sending {msg}")
-        async with self.com_lock:
-            self.writer.write(msg)
-            await self.writer.drain()
-            self.log.debug(f"sent {msg}")
-            try:
-                data = await asyncio.wait_for(
-                    self.reader.readuntil(separator=bytes("\n", "ascii")),
-                    timeout=self.timeout,
-                )
-            except (asyncio.IncompleteReadError, ConnectionResetError):
-                await self.handle_lost_connection()
-            self.log.debug(f"Received: {data.decode()!r}")
-        return data.decode()
+        async with self.comm_lock:
+            if wait_for_ready:
+                await self.wait_for_ready()
+            return await self._basic_send_command(cmd)
+
+    async def _basic_send_command(self, cmd):
+        """Send a command and wait for the reply, without locking.
+
+        You must obtain self.comm_lock before calling.
+
+        This exists to support wait_for_ready and send_command.
+
+        Parameters
+        ----------
+        cmd : `str`
+            Command to write, with no "\r\n" terminator.
+
+        Returns
+        -------
+        reply : `str`
+            The reply, with trailing "\r\n" stripped.
+
+        Raises
+        ------
+        RuntimeError
+            If self.comm_lock is not locked.
+        """
+        if not self.comm_lock.locked():
+            raise RuntimeError("You must obtain the command lock first")
+        cmd_bytes = cmd.encode() + tcpip.TERMINATOR
+        self.log.debug(f"Send command {cmd_bytes!r}")
+        self.writer.write(cmd_bytes)
+        await self.writer.drain()
+
+        try:
+            reply_bytes = await asyncio.wait_for(
+                self.reader.readuntil(separator=b"\n"),
+                timeout=self.timeout,
+            )
+        except (asyncio.IncompleteReadError, ConnectionResetError):
+            await self.handle_lost_connection()
+            return
+        self.log.debug(f"Received reply: {reply_bytes!r}")
+        return reply_bytes.decode().strip()
 
     async def check_status(self):
         """
@@ -131,18 +166,7 @@ class AlignmentModel:
         EMP if executing measurement plan
         ERR-xxx if there is an error with error code xxx
         """
-        return await self.send_msg("?STAT")
-
-    async def send_string(self, message):
-        """
-        sends a string
-
-        Parameters
-        ----------
-        message : `str`
-            characters to send to T2SA.
-        """
-        return await self.send_msg(message)
+        return await self.send_command("?STAT")
 
     async def laser_status(self):
         """
@@ -153,8 +177,7 @@ class AlignmentModel:
         LOFF if laser is off
         ERR-xxx if there is an error with error code xxx
         """
-
-        await self.send_msg("?LSTA")
+        return await self.send_command("?LSTA")
 
     async def laser_on(self):
         """
@@ -164,7 +187,7 @@ class AlignmentModel:
         -------
         ACK300 or ERR code
         """
-        return await self.send_msg("!LST:1")
+        return await self.send_command("!LST:1")
 
     async def laser_off(self):
         """
@@ -174,13 +197,13 @@ class AlignmentModel:
         -------
         ACK300 or ERR code
         """
-        await self.send_msg("!LST:0")
+        return await self.send_command("!LST:0")
 
     async def set_simulation_mode(self, sim_mode):
         if sim_mode:
-            return await self.send_msg("!SET_SIM:1")
+            return await self.send_command("!SET_SIM:1")
         else:
-            return await self.send_msg("!SET_SIM:0")
+            return await self.send_command("!SET_SIM:0")
 
     async def tracker_off(self):
         """
@@ -190,7 +213,7 @@ class AlignmentModel:
         -------
         ACK300 or ERR code
         """
-        return await self.send_msg("!LST:2")
+        return await self.send_command("!LST:2")
 
     async def measure_m2(self):
         """
@@ -201,10 +224,9 @@ class AlignmentModel:
         ACK300 or ERR code
         """
         self.log.debug("measure m2")
-        msg = "!CMDEXE:M2"
-        self.log.debug(f"waiting for ready before sending {msg}")
-        await self.wait_for_ready()
-        return await self.send_msg(msg)
+        cmd = "!CMDEXE:M2"
+        self.log.debug(f"waiting for ready before sending {cmd}")
+        return await self.send_command(cmd, wait_for_ready=True)
 
     async def measure_m1m3(self):
         """
@@ -215,10 +237,9 @@ class AlignmentModel:
         ACK300 or ERR code
         """
         self.log.debug("measure m1m3")
-        msg = "!CMDEXE:M1M3"
-        self.log.debug(f"waiting for ready before sending {msg}")
-        await self.wait_for_ready()
-        return await self.send_msg(msg)
+        cmd = "!CMDEXE:M1M3"
+        self.log.debug(f"waiting for ready before sending {cmd}")
+        return await self.send_command(cmd, wait_for_ready=True)
 
     async def measure_cam(self):
         """
@@ -234,10 +255,9 @@ class AlignmentModel:
             await asyncio.sleep(2)
             self.first_measurement = False
         self.log.debug("measure cam")
-        msg = "!CMDEXE:CAM"
-        self.log.debug(f"waiting for ready before sending {msg}")
-        await self.wait_for_ready()
-        return await self.send_msg(msg)
+        cmd = "!CMDEXE:CAM"
+        self.log.debug(f"waiting for ready before sending {cmd}")
+        return await self.send_command(cmd, wait_for_ready=True)
 
     async def query_m2_position(self):
         """
@@ -250,8 +270,8 @@ class AlignmentModel:
         """
 
         self.log.debug("query m2")
-        msg = "?POS M2"
-        return await self.send_msg(msg)
+        cmd = "?POS M2"
+        return await self.send_command(cmd)
 
     async def query_m1m3_position(self):
         """
@@ -264,8 +284,8 @@ class AlignmentModel:
         """
 
         self.log.debug("query m1m3")
-        msg = "?POS M1M3"
-        return await self.send_msg(msg)
+        cmd = "?POS M1M3"
+        return await self.send_command(cmd)
 
     async def query_cam_position(self):
         """
@@ -278,8 +298,8 @@ class AlignmentModel:
         """
 
         self.log.debug("query cam")
-        msg = "?POS CAM"
-        return await self.send_msg(msg)
+        cmd = "?POS CAM"
+        return await self.send_command(cmd)
 
     async def query_point_position(self, pointgroup, point, collection="A"):
         """
@@ -298,8 +318,8 @@ class AlignmentModel:
         -------
         Point Coordiante String
         """
-        msg = f"?POINT_POS:{collection};{pointgroup};{point}"
-        return await self.send_msg(msg)
+        cmd = f"?POINT_POS:{collection};{pointgroup};{point}"
+        return await self.send_command(cmd)
 
     async def query_m2_offset(self, refPtGrp="M1M3"):
         """
@@ -316,8 +336,8 @@ class AlignmentModel:
         M2 Offset String
         """
 
-        msg = "?OFFSET:" + refPtGrp + ";M2"
-        return await self.send_msg(msg)
+        cmd = "?OFFSET:" + refPtGrp + ";M2"
+        return await self.send_command(cmd)
 
     async def query_m1m3_offset(self, refPtGrp="M1M3"):
         """
@@ -334,8 +354,8 @@ class AlignmentModel:
         M1M3 Offset String
         """
 
-        msg = "?OFFSET:" + refPtGrp + ";M1M3"
-        return await self.send_msg(msg)
+        cmd = "?OFFSET:" + refPtGrp + ";M1M3"
+        return await self.send_command(cmd)
 
     async def query_cam_offset(self, refPtGrp="M1M3"):
         """
@@ -352,8 +372,8 @@ class AlignmentModel:
         Camera Offset String
         """
 
-        msg = "?OFFSET:" + refPtGrp + ";CAM"
-        return await self.send_msg(msg)
+        cmd = "?OFFSET:" + refPtGrp + ";CAM"
+        return await self.send_command(cmd)
 
     async def query_point_delta(
         self, p1group, p1, p2group, p2, p1collection="A", p2collection="A"
@@ -380,10 +400,10 @@ class AlignmentModel:
         -------
         Point Delta or ERR code
         """
-        msg = (
+        cmd = (
             f"?POINT_DELTA:{p1collection};{p1group};{p1};{p2collection};{p2group};{p2}"
         )
-        return await self.send_msg(msg)
+        return await self.send_command(cmd)
 
     async def clear_errors(self):
         """
@@ -391,8 +411,8 @@ class AlignmentModel:
         This may be deprecated soon
         """
 
-        msg = "!CLERCL"
-        return await self.send_msg(msg)
+        cmd = "!CLERCL"
+        return await self.send_command(cmd)
 
     async def set_randomize_points(self, randomize_points):
         """
@@ -409,12 +429,12 @@ class AlignmentModel:
         """
 
         if randomize_points == 1:
-            msg = "SET_RANDOMIZE_POINTS:1"
+            cmd = "SET_RANDOMIZE_POINTS:1"
         elif randomize_points == 0:
-            msg = "SET_RANDOMIZE_POINTS:0"
+            cmd = "SET_RANDOMIZE_POINTS:0"
         else:
-            msg = "SET_RANDOMIZE_POINTS:" + str(randomize_points)
-        return await self.send_msg(msg)
+            cmd = "SET_RANDOMIZE_POINTS:" + str(randomize_points)
+        return await self.send_command(cmd)
 
     async def set_power_lock(self, power_lock):
         """
@@ -432,10 +452,10 @@ class AlignmentModel:
         """
 
         if power_lock:
-            msg = "SET_POWER_LOCK:1"
+            cmd = "SET_POWER_LOCK:1"
         else:
-            msg = "SET_POWER_LOCK:0"
-        return await self.send_msg(msg)
+            cmd = "SET_POWER_LOCK:0"
+        return await self.send_command(cmd)
 
     async def twoFace_check(self, pointgroup):
         """
@@ -451,8 +471,8 @@ class AlignmentModel:
         ACK300 or ERR code
         """
 
-        msg = "!2FACE_CHECK:" + pointgroup
-        return await self.send_msg(msg)
+        cmd = "!2FACE_CHECK:" + pointgroup
+        return await self.send_command(cmd)
 
     async def measure_drift(self, pointgroup):
         """
@@ -468,8 +488,8 @@ class AlignmentModel:
         ACK300 or ERR code
         """
 
-        msg = "!MEAS_DRIFT:" + pointgroup
-        return await self.send_msg(msg)
+        cmd = "!MEAS_DRIFT:" + pointgroup
+        return await self.send_command(cmd)
 
     async def measure_single_point(self, collection, pointgroup, target):
         """
@@ -488,8 +508,8 @@ class AlignmentModel:
         ACK300 or ERR code
         """
 
-        msg = f"!MEAS_SINGLE_POINT:{collection};{pointgroup};{target}"
-        return await self.send_msg(msg)
+        cmd = f"!MEAS_SINGLE_POINT:{collection};{pointgroup};{target}"
+        return await self.send_command(cmd)
 
     async def single_point_measurement_profile(self, profile):
         """
@@ -505,8 +525,8 @@ class AlignmentModel:
         ACK300 or ERR code
         """
 
-        msg = "!SINGLE_POINT_MEAS_PROFILE:" + profile
-        return await self.send_msg(msg)
+        cmd = "!SINGLE_POINT_MEAS_PROFILE:" + profile
+        return await self.send_command(cmd)
 
     async def generate_report(self, reportname):
         """
@@ -522,8 +542,8 @@ class AlignmentModel:
         ACK300 or ERR code
         """
 
-        msg = "!GEN_REPORT:" + reportname
-        return await self.send_msg(msg)
+        cmd = "!GEN_REPORT:" + reportname
+        return await self.send_command(cmd)
 
     async def set_2face_tolerance(self, az_tol, el_tol, range_tol):
         """
@@ -540,8 +560,8 @@ class AlignmentModel:
         ACK300 or ERR code
         """
 
-        msg = f"!SET_2FACE_TOL:{az_tol};{el_tol};{range_tol}"
-        return await self.send_msg(msg)
+        cmd = f"!SET_2FACE_TOL:{az_tol};{el_tol};{range_tol}"
+        return await self.send_command(cmd)
 
     async def set_drift_tolerance(self, rms_tol, max_tol):
         """
@@ -560,8 +580,8 @@ class AlignmentModel:
         ACK300 or ERR code
         """
 
-        msg = f"!SET_DRIFT_TOL:{rms_tol};{max_tol}"
-        return await self.send_msg(msg)
+        cmd = f"!SET_DRIFT_TOL:{rms_tol};{max_tol}"
+        return await self.send_command(cmd)
 
     async def set_ls_tolerance(self, rms_tol, max_tol):
         """
@@ -579,8 +599,8 @@ class AlignmentModel:
         ACK300 or ERR code
         """
 
-        msg = f"!SET_LS_TOL:{rms_tol};{max_tol}"
-        return await self.send_msg(msg)
+        cmd = f"!SET_LS_TOL:{rms_tol};{max_tol}"
+        return await self.send_command(cmd)
 
     async def load_template_file(self, filepath):
         """
@@ -596,8 +616,8 @@ class AlignmentModel:
         ACK300 or ERR code
         """
 
-        msg = "!LOAD_SA_TEMPLATE_FILE;" + filepath
-        return await self.send_msg(msg)
+        cmd = "!LOAD_SA_TEMPLATE_FILE;" + filepath
+        return await self.send_command(cmd)
 
     async def set_reference_group(self, pointgroup):
         """
@@ -614,8 +634,8 @@ class AlignmentModel:
         ACK300 or ERR code
         """
 
-        msg = "!SET_REFERENCE_GROUP:" + pointgroup
-        return await self.send_msg(msg)
+        cmd = "!SET_REFERENCE_GROUP:" + pointgroup
+        return await self.send_command(cmd)
 
     async def set_working_frame(self, workingframe):
         """
@@ -633,8 +653,8 @@ class AlignmentModel:
         ACK300 or ERR code
         """
 
-        msg = "!SET_WORKING_FRAME:" + workingframe
-        return await self.send_msg(msg)
+        cmd = "!SET_WORKING_FRAME:" + workingframe
+        return await self.send_command(cmd)
 
     async def new_station(self):
         """
@@ -645,8 +665,8 @@ class AlignmentModel:
         ACK300 or ERR code
         """
 
-        msg = "!NEW_STATION"
-        return await self.send_msg(msg)
+        cmd = "!NEW_STATION"
+        return await self.send_command(cmd)
 
     async def save_sa_jobfile(self, filepath):
         """
@@ -662,8 +682,8 @@ class AlignmentModel:
         ACK300 or ERR code
         """
 
-        msg = "!SAVE_SA_JOBFILE;" + filepath
-        return await self.send_msg(msg)
+        cmd = "!SAVE_SA_JOBFILE;" + filepath
+        return await self.send_command(cmd)
 
     async def set_station_lock(self, station_locked):
         """
@@ -680,10 +700,10 @@ class AlignmentModel:
         ACK300 or ERR code
         """
         if station_locked:
-            msg = "!SET_STATION_LOCK:1"
+            cmd = "!SET_STATION_LOCK:1"
         else:
-            msg = "!SET_STATION_LOCK:0"
-        return await self.send_msg(msg)
+            cmd = "!SET_STATION_LOCK:0"
+        return await self.send_command(cmd)
 
     async def reset_t2sa(self):
         """
@@ -694,8 +714,8 @@ class AlignmentModel:
         ACK300 or ERR code
         """
 
-        msg = "!RESET_T2SA"
-        return await self.send_msg(msg)
+        cmd = "!RESET_T2SA"
+        return await self.send_command(cmd)
 
     async def halt(self):
         """
@@ -707,8 +727,8 @@ class AlignmentModel:
         ACK300 or ERR code
         """
 
-        msg = "!HALT"
-        return await self.send_msg(msg)
+        cmd = "!HALT"
+        return await self.send_command(cmd)
 
     async def set_telescope_position(self, telalt, telaz, camrot):
         """
@@ -730,8 +750,8 @@ class AlignmentModel:
         ACK300 or ERR code
         """
 
-        msg = f"!PUBLISH_ALT_AZ_ROT:{telalt};{telaz};{camrot}"
-        return await self.send_msg(msg)
+        cmd = f"!PUBLISH_ALT_AZ_ROT:{telalt};{telaz};{camrot}"
+        return await self.send_command(cmd)
 
     async def set_num_samples(self, numsamples):
         """
@@ -748,8 +768,8 @@ class AlignmentModel:
         ACK300 or ERR code
         """
 
-        msg = f"SET_NUM_SAMPLES:{numsamples}"
-        return await self.send_msg(msg)
+        cmd = f"SET_NUM_SAMPLES:{numsamples}"
+        return await self.send_command(cmd)
 
     async def set_num_iterations(self, numiters):
         """
@@ -766,8 +786,8 @@ class AlignmentModel:
         ACK300 or ERR code
         """
 
-        msg = f"SET_NUM_ITERATIONS:{numiters}"
-        return await self.send_msg(msg)
+        cmd = f"SET_NUM_ITERATIONS:{numiters}"
+        return await self.send_command(cmd)
 
     async def increment_measured_index(self, inc=1):
         """
@@ -783,8 +803,8 @@ class AlignmentModel:
         ACK300 or ERR code
         """
 
-        msg = f"INC_MEAS_INDEX:{inc}"
-        return await self.send_msg(msg)
+        cmd = f"INC_MEAS_INDEX:{inc}"
+        return await self.send_command(cmd)
 
     async def set_measured_index(self, idx):
         """
@@ -800,8 +820,8 @@ class AlignmentModel:
         ACK300 or ERR code
         """
 
-        msg = f"SET_MEAS_INDEX:{idx}"
-        return await self.send_msg(msg)
+        cmd = f"SET_MEAS_INDEX:{idx}"
+        return await self.send_command(cmd)
 
     async def save_settings(self):
         """
@@ -815,8 +835,8 @@ class AlignmentModel:
         ACK300 or ERR code
         """
 
-        msg = "!SAVE_SETTINGS"
-        return await self.send_msg(msg)
+        cmd = "!SAVE_SETTINGS"
+        return await self.send_command(cmd)
 
     async def load_tracker_compensation(self, compfile):
         """
@@ -832,5 +852,5 @@ class AlignmentModel:
         ACK300 or ERR code
         """
 
-        msg = "!LOAD_TRACKER_COMPENSATION:" + compfile
-        return await self.send_msg(msg)
+        cmd = "!LOAD_TRACKER_COMPENSATION:" + compfile
+        return await self.send_command(cmd)

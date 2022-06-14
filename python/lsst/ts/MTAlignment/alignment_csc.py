@@ -1,9 +1,12 @@
-from .alignmentModel import AlignmentModel
-from lsst.ts import salobj
+__all__ = ["AlignmentCSC", "run_MTAlignment"]
+
+import asyncio
 import enum
+
+from lsst.ts import salobj
+from .alignment_model import AlignmentModel
 from .config_schema import CONFIG_SCHEMA
 from . import __version__
-import logging
 
 
 class AlignmentDetailedState(enum.IntEnum):
@@ -18,6 +21,29 @@ class AlignmentDetailedState(enum.IntEnum):
 
 
 class AlignmentCSC(salobj.ConfigurableCsc):
+    """CSC to control the MT alignment measurement system.
+
+    Parameters
+    ----------
+    config_dir : `str` (optional)
+        Directory of configuration files, or None for the standard
+        configuration directory (obtained from `get_default_config_dir`).
+        This is provided for unit testing.
+    initial_state : `salobj.State` (optional)
+        The initial state of the CSC. Typically one of:
+        - State.ENABLED if you want the CSC immediately usable.
+        - State.STANDBY if you want full emulation of a CSC.
+    override : `str`, optional
+        Configuration override file to apply if ``initial_state`` is
+        `State.DISABLED` or `State.ENABLED`.
+    simulation_mode : `int`, optional
+        Simulation mode; one of:
+
+        * 0: normal operation
+        * 1: use the simulation features of SpatialAnalyzer
+        * 2: minimal internal simulator with canned responses
+    """
+
     version = __version__
     valid_simulation_modes = (0, 1, 2)
     simulation_help = """
@@ -38,40 +64,37 @@ class AlignmentCSC(salobj.ConfigurableCsc):
         self,
         config_dir=None,
         initial_state=salobj.State.STANDBY,
+        override="",
         simulation_mode=0,
-        use_port_zero=False,
     ):
         super().__init__(
-            "MTAlignment",
+            name="MTAlignment",
             index=0,
             config_schema=CONFIG_SCHEMA,
             config_dir=config_dir,
             initial_state=initial_state,
+            override=override,
             simulation_mode=simulation_mode,
         )
         self.model = None
         self.max_iters = 3
-
-        self.log.addHandler(logging.StreamHandler())
-        self.log.setLevel(logging.DEBUG)
 
         # temporary variables for position; these will eventually be supplied
         # by the TMA and camera rotator CSCs.
         self.elevation = 90
         self.azimuth = 0
         self.camrot = 0
-        self.use_port_zero = use_port_zero
         self.last_measurement = None
 
     async def handle_summary_state(self):
         if self.disabled_or_enabled:
             if self.model is None:
                 self.model = AlignmentModel(
-                    self.config.t2sa_ip, self.config.t2sa_port, log=self.log
+                    host=self.config.t2sa_ip,
+                    port=self.config.t2sa_port,
+                    simulation_mode=self.simulation_mode,
+                    log=self.log,
                 )
-                self.model.simulation_mode = self.simulation_mode
-                self.model.port = self.config.t2sa_port
-                self.model.host = self.config.t2sa_ip
                 await self.model.connect()
                 self.log.debug(
                     f"connected to t2sa at {self.model.host}:{self.model.port}"
@@ -205,7 +228,7 @@ class AlignmentCSC(salobj.ConfigurableCsc):
         aligned = False
         loopcount = 1
         while not aligned:
-            print("Loop Number: " + str(loopcount))
+            self.log.info(f"Loop iteration: {loopcount}")
             await self.model.measure_cam()
             await self.model.measure_m2()
 
@@ -256,9 +279,7 @@ class AlignmentCSC(salobj.ConfigurableCsc):
         return coordsDict
 
     def in_tolerance(self, coords):
-        """
-        Takes coordinates returns true/false based on whether they are within
-        tolerance.
+        """Returns true if the specified coords are in tolerance.
 
         Parameters
         ----------
@@ -266,6 +287,9 @@ class AlignmentCSC(salobj.ConfigurableCsc):
         coords : `Dict`
             Dict containing coordinates
         """
+        raise NotImplementedError()
 
-        print(coords)
-        return False
+
+def run_MTAlignment():
+    """Run the MTAlignment CSC."""
+    asyncio.run(AlignmentCSC.amain(index=None))

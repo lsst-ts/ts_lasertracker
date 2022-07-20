@@ -1,5 +1,6 @@
 from enum import IntEnum
 
+
 class T2SAErrors(IntEnum):
     NoError = 200
     CommandRejected = 300
@@ -9,7 +10,7 @@ class T2SAErrors(IntEnum):
 
     DriftCheckFailedToleranceCheck = 304
     MeasurementOfPointFailed = 305
-    DidFindOrSetPointGroupAndTargetName = 306
+    # DidNotFindOrSetPointGroupAndTargetName = 306
     RequestedMeasurementProfileDoesNotExist = 307
     SAReportTemplateNotFound = 308
 

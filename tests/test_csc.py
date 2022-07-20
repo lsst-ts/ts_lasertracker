@@ -34,7 +34,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         await self.check_bin_script(
             name="MTAlignment",
             index=0,
-            exe_name="run_MTAlignment",
+            exe_name="run_mtalignment",
         )
 
     async def test_standard_state_transitions(self):

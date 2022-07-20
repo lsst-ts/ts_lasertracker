@@ -18,7 +18,7 @@ The primary classes are:
 * `AlignmentCSC`: the CSC.
 * `AlignmentModel`: contains most of the implementation and communicates with the 2TSA.
 
-.. automodapi:: lsst.ts.mtalignment
+.. automodapi:: lsst.ts.MTAlignment
    :no-main-docstr:
 
 Build and Test

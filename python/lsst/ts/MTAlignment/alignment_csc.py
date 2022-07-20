@@ -1,4 +1,4 @@
-__all__ = ["AlignmentCSC", "run_MTAlignment"]
+__all__ = ["AlignmentCSC", "run_mtalignment"]
 
 import asyncio
 import enum
@@ -290,6 +290,6 @@ class AlignmentCSC(salobj.ConfigurableCsc):
         raise NotImplementedError()
 
 
-def run_MTAlignment():
+def run_mtalignment():
     """Run the MTAlignment CSC."""
     asyncio.run(AlignmentCSC.amain(index=None))

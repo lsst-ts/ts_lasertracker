@@ -169,7 +169,7 @@ class AlignmentCSC(salobj.ConfigurableCsc):
     async def do_laserPower(self, data):
         """put the laser in sleep state"""
         self.assert_enabled()
-        if data.laserPower == 0:
+        if data.power == 0:
             await self.model.laser_off()
         else:
             await self.model.laser_on()

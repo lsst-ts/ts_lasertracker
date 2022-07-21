@@ -26,8 +26,10 @@ import asyncio
 from lsst.ts import utils
 from lsst.ts import tcpip
 
-FAILED_ACK = "ACK000"
-OK_ACK = "ACK300"
+# Good reply bodies. They should come after the initial "ACK-300 " in replies,
+# and thus are intended as arguments to `write_good_reply`.
+ALREADY_MEASURING_REPLY = "ACK000"
+OK_REPLY = "ACK300"  # Command was accepted
 
 
 class MockT2SA(tcpip.OneClientServer):
@@ -118,10 +120,10 @@ class MockT2SA(tcpip.OneClientServer):
         self.log.debug("begin measuring")
         # Schedule task that will emulate measurement in the background
         if self.measuring:
-            await self.write_reply(FAILED_ACK)
+            await self.write_good_reply(ALREADY_MEASURING_REPLY)
         else:
             self.measure_task = asyncio.create_task(self.measure())
-            await self.write_reply(OK_ACK)
+            await self.write_good_reply(OK_REPLY)
 
     async def do_status(self):
         """Return status.
@@ -131,9 +133,9 @@ class MockT2SA(tcpip.OneClientServer):
         """
 
         if self.measuring:
-            await self.write_reply("EMP")
+            await self.write_good_reply("EMP")
         else:
-            await self.write_reply("READY")
+            await self.write_good_reply("READY")
 
     def run_reply_loop(self, server):
         self.reply_loop_task.cancel()
@@ -164,10 +166,11 @@ class MockT2SA(tcpip.OneClientServer):
                 else:
                     canned_reply = self.canned_replies.get(cmd)
                     if canned_reply:
-                        await self.write_reply(canned_reply)
+                        await self.write_good_reply(canned_reply)
                     else:
-                        self.log.error(f"Unsupported command {cmd!r}")
-                        await self.write_reply(FAILED_ACK)
+                        err_msg = f"Unsupported command {cmd!r}"
+                        self.log.error(err_msg)
+                        await self._write_reply(f"ERR-300 {err_msg}")
         except asyncio.CancelledError:
             pass
         except (asyncio.IncompleteReadError, ConnectionResetError):
@@ -183,13 +186,16 @@ class MockT2SA(tcpip.OneClientServer):
         await asyncio.sleep(self.measurement_duration)
         self.log.debug("stop pretending to measure")
 
-    async def write_reply(self, reply):
-        """Write a reply to the client.
+    async def write_good_reply(self, reply):
+        """Write a good reply to the client, prefixed with 'ACK-300 '
 
         Parameters
         ----------
         reply : `str`
-            The reply (without a trailing "\r\n")
+            The reply (without a leading ACK-300 or trailing "\r\n")
         """
+        await self._write_reply(f"ACK-300 {reply}")
+
+    async def _write_reply(self, reply):
         self.writer.write(reply.encode() + tcpip.TERMINATOR)
         await self.writer.drain()

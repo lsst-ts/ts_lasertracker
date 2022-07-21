@@ -24,7 +24,9 @@ __all__ = ["T2SAErrorCode"]
 from enum import IntEnum
 
 
-class T2SAErrors(IntEnum):
+class T2SAErrorCode(IntEnum):
+    """Error codes in T2SA replies."""
+
     NoError = 200
     CommandRejected = 300
     FailedToSetLaserOff = 301

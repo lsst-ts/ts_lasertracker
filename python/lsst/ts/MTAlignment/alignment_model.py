@@ -1,10 +1,35 @@
+# This file is part of ts_MTAlignment.
+#
+# Developed for the Vera C. Rubin Observatory Telescope and Site Systems.
+# This product includes software developed by the LSST Project
+# (https://www.lsst.org).
+# See the COPYRIGHT file at the top-level directory of this distribution
+# for details of code ownership.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 __all__ = ["LaserStatus", "TrackerStatus", "T2SAError", "AlignmentModel"]
 
 import asyncio
 from enum import IntEnum
 import logging
-from .mock_t2sa import MockT2SA
+import re
+
 from lsst.ts import tcpip
+from .mock_t2sa import MockT2SA
+
+LOCALHOST = "127.0.0.1"
 
 
 class LaserStatus(IntEnum):
@@ -22,19 +47,28 @@ class TrackerStatus(IntEnum):
     ERR = 6
 
 
+class T2SAError(Exception):
+    """Error raised by send_command if the T2SA returns an error."""
+
+    def __init__(self, error_code, message):
+        super().__init__(message)
+        self.error_code = error_code
+
+
 class AlignmentModel:
     def __init__(self, host, port, simulation_mode=0, log=logging.getLogger()):
         self.host = host
         self.port = port
         self.log = log
-        self.connected = False
         self.reader = None
         self.writer = None
         self.first_measurement = True
         self.simulation_mode = simulation_mode
+        self.t2sa_simulation_mode_set = False
         self.comm_lock = asyncio.Lock()
         self.mock_t2sa_ip = "127.0.0.1"
-        self.timeout = 10
+        self.timeout = 30
+        self.reply_regex = re.compile(r"(ACK|ERR)-(\d\d\d):? +(.*)")
 
     async def connect(self):
         """Connect to the T2SA.
@@ -45,26 +79,28 @@ class AlignmentModel:
             self.mock_t2sa = MockT2SA(port=0, log=self.log)
             await self.mock_t2sa.start_task
             self.port = self.mock_t2sa.port
-            self.reader, self.writer = await asyncio.open_connection(
-                self.mock_t2sa_ip, self.port
-            )
-            print(f"connected to mock T2SA at {self.mock_t2sa_ip}:{self.port}")
-            self.log.debug(f"connected to mock T2SA at {self.mock_t2sa_ip}:{self.port}")
-            await self.set_simulation_mode(1)  # make sure T2SA is also in sim mode
+            self.host = LOCALHOST
+            self.log.debug(f"Connect to mock T2SA at {self.host}:{self.port}")
+            t2sa_simulation_mode = 1
         else:
-            self.log.debug(
-                f"attempting to connect to real T2SA at {self.host}:{self.port}"
-            )
-            self.reader, self.writer = await asyncio.open_connection(
-                self.host,
-                self.port,
-            )
-            await self.set_simulation_mode(0)
-        self.connected = True
+            self.log.debug(f"Connect to real T2SA at {self.host}:{self.port}")
+            t2sa_simulation_mode = 0
+        self.reader, self.writer = await asyncio.open_connection(self.host, self.port)
+        await self.set_simulation_mode(t2sa_simulation_mode)
+
+    @property
+    def connected(self):
+        """Return True if connected."""
+        return not (
+            self.reader is None
+            or self.writer is None
+            or self.reader.at_eof()
+            or self.writer.is_closing()
+        )
 
     async def disconnect(self):
-        await tcpip.close_stream_writer(self.writer)
-        self.connected = False
+        if self.writer is not None:
+            await tcpip.close_stream_writer(self.writer)
 
     async def wait_for_ready(self):
         """Wait for the tracker to report ready.
@@ -87,10 +123,11 @@ class AlignmentModel:
             # even if the tracker reports ready.
             # If that is false, move this line to the end of the while block
             await asyncio.sleep(0.5)
-            if reply == "READY":
+            if reply.startswith("READY"):
                 return
-            elif reply != "EMP":
-                raise RuntimeError("Unrecognized reply {reply!r}")
+            # Apparently we ought to only see READY... or EMP
+            # but in fact we see many other replies as well,
+            # so accept and ignore any OK reply that is not READY...
 
     async def handle_lost_connection(self):
         """Handle a connection that is unexpectedly lost."""
@@ -110,7 +147,14 @@ class AlignmentModel:
         Returns
         -------
         reply : `str`
-            The reply, with trailing "\r\n" stripped.
+            The reply, with leading "ACK-300 " and trailing "\r\n" stripped.
+
+        Raises
+        ------
+        RuntimeError
+            If the reply cannot be parsed.
+        T2SAError
+            If the reply is an error.
         """
         async with self.comm_lock:
             if wait_for_ready:
@@ -121,7 +165,6 @@ class AlignmentModel:
         """Send a command and wait for the reply, without locking.
 
         You must obtain self.comm_lock before calling.
-
         This exists to support wait_for_ready and send_command.
 
         Parameters
@@ -132,15 +175,27 @@ class AlignmentModel:
         Returns
         -------
         reply : `str`
-            The reply, with trailing "\r\n" stripped.
+            The reply, with leading "ACK-300 " and trailing "\r\n" stripped.
 
         Raises
         ------
         RuntimeError
-            If self.comm_lock is not locked.
+            If self.comm_lock is not locked, the connection is lost,
+            timeout waiting for a reply, or the reply cannot be parsed.
+        T2SAError
+            If the reply is an error.
+
+        Notes
+        -----
+        If the reply is a bare "EMP" then that is what is returned.
+
+        If the code times out while waiting for a reply then the connection
+        is closed.
         """
         if not self.comm_lock.locked():
             raise RuntimeError("You must obtain the command lock first")
+        if not self.connected:
+            raise RuntimeError("Not connected")
         cmd_bytes = cmd.encode() + tcpip.TERMINATOR
         self.log.debug(f"Send command {cmd_bytes!r}")
         self.writer.write(cmd_bytes)
@@ -148,14 +203,33 @@ class AlignmentModel:
 
         try:
             reply_bytes = await asyncio.wait_for(
-                self.reader.readuntil(separator=b"\n"),
+                self.reader.readuntil(separator=tcpip.TERMINATOR),
                 timeout=self.timeout,
             )
+            self.log.debug(f"Received reply: {reply_bytes!r}")
         except (asyncio.IncompleteReadError, ConnectionResetError):
+            err_msg = f"Connection lost while executing command {cmd}"
+            self.log.error(err_msg)
             await self.handle_lost_connection()
-            return
-        self.log.debug(f"Received reply: {reply_bytes!r}")
-        return reply_bytes.decode().strip()
+            raise RuntimeError(err_msg)
+        except asyncio.TimeoutError:
+            err_msg = (
+                f"Timed out while waiting for a reply to command {cmd}; disconnecting"
+            )
+            self.log.error(err_msg)
+            await self.handle_lost_connection()
+            raise RuntimeError(err_msg)
+
+        reply_str = reply_bytes.decode().strip()
+        if reply_str == "EMP":
+            return reply_str
+        reply_match = self.reply_regex.match(reply_str)
+        if reply_match is None:
+            raise RuntimeError(f"Cannot parse reply {reply_str!r}")
+        reply_type, reply_code, reply_body = reply_match.groups()
+        if reply_type == "ACK":
+            return reply_body
+        raise T2SAError(error_code=reply_code, message=reply_body)
 
     async def check_status(self):
         """
@@ -202,10 +276,10 @@ class AlignmentModel:
         return await self.send_command("!LST:0")
 
     async def set_simulation_mode(self, sim_mode):
-        if sim_mode:
-            return await self.send_command("!SET_SIM:1")
-        else:
-            return await self.send_command("!SET_SIM:0")
+        """Set the T2SA's simulation mode."""
+        if sim_mode not in (0, 1):
+            raise ValueError(f"sim_mode={sim_mode} must be 0 or 1")
+        return await self.send_command(f"!SET_SIM:{sim_mode}")
 
     async def tracker_off(self):
         """

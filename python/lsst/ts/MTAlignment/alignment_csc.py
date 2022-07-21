@@ -1,4 +1,4 @@
-__all__ = ["AlignmentCSC", "run_mtalignment"]
+__all__ = ["AlignmentDetailedState", "AlignmentCSC", "run_mtalignment"]
 
 import asyncio
 import enum

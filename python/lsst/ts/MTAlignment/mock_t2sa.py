@@ -1,3 +1,5 @@
+__all__ = ["MockT2SA"]
+
 import asyncio
 
 from lsst.ts import utils

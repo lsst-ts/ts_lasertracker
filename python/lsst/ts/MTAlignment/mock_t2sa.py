@@ -23,7 +23,8 @@ __all__ = ["MockT2SA"]
 
 import asyncio
 
-from lsst.ts import tcpip, utils
+from lsst.ts import tcpip
+from lsst.ts import utils
 
 # Good reply bodies. They should come after the initial "ACK-300 " in replies,
 # and thus are intended as arguments to `write_good_reply`.
@@ -40,7 +41,7 @@ class MockT2SA(tcpip.OneClientServer):
     Parameters
     ----------
     host : `str` or `None`
-        IP address for this server; typically `LOCALHOST`
+        IP address for this server; typically `LOCAL_HOST`
     port : `int`
         IP port for this server. If 0 then randomly pick an available port
         (or ports, if listening on multiple sockets).
@@ -51,7 +52,7 @@ class MockT2SA(tcpip.OneClientServer):
     Attributes
     ----------
     host : `str` or `None`
-        IP address for this server; typically `LOCALHOST`
+        IP address for this server; typically `LOCAL_HOST`
     port : `int`
         IP port for this server. If this mock was constructed with port=0
         then this will be the assigned port, once `start` is done.
@@ -60,7 +61,7 @@ class MockT2SA(tcpip.OneClientServer):
     # How long to wait while pretending to measure (seconds)
     measurement_duration = 2
 
-    def __init__(self, log, host="127.0.0.1", port=0):
+    def __init__(self, log, host=tcpip.LOCAL_HOST, port=0):
         self.reader = None
         self.writer = None
         self.run_loop_flag = True

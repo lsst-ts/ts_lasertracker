@@ -28,66 +28,77 @@ CONFIG_SCHEMA = yaml.safe_load(
 $schema: http://json-schema.org/draft-07/schema#
 $id: https://github.com/lsst-ts/ts_MTAlignment/blob/master/schema/alignment.yaml
 # title must end with one or more spaces followed by the schema version, which must begin with "v"
-title: Alignment v2
+title: Alignment v3
 description: Schema for MT Alignment CSC configuration files
 type: object
 properties:
-  t2sa_ip:
-    description: IP address of T2SA instance.
+  t2sa_host:
+    description: TCP/IP host address of T2SA.
     type: string
   t2sa_port:
-    description: port of T2SA instance.
+    description: TCP/IP port of T2SA.
     type: number
+  read_timeout:
+    description: Timeout for reading T2SA replies to commands (seconds).
+    type: number
+  targets:
+    description: Names of valid targets. Must include "CAM", "M1M3", and "M2".
+    type: array
+    items:
+      type: string
+    minItems: 3
   num_iterations:
-    description: number of times to repeat measurements of a point group
+    description: Number of times to repeat measurements of a point group.
     type: number
   num_samples:
-    description: number of times to sample each point within a single visit
+    description: Number of times to sample each point within a single visit.
     type: number
   randomize_points:
-    description: if true, visit the SMRs in a random order
+    description: Visit the SMRs in a random order?
     type: boolean
   station_lock:
     description: >-
-      if true, prevents SpatialAnalyzer from automatically jumping stations
-      if it detects that the tracker has drifted
+      If true, prevents SpatialAnalyzer from automatically jumping stations
+      if it detects that the tracker has drifted.
     type: boolean
   rms_tolerance:
-    description: RMS least squares tolerance in mm
+    description: RMS least squares tolerance in mm.
     type: number
   max_tolerance:
-    description: maximum absolute tolerance  in mm
+    description: Maximum absolute tolerance  in mm.
     type: number
   two_face_az_tolerance:
     description: >-
-      maximum azimuth divergence allowed when measuring the same point using the
-      tracker's two different "facings" in decimal degrees
+      Maximum allowed azimuth divergence (degrees) when measuring
+      the same point using the tracker's two different "facings".
     type: number
   two_face_el_tolerance:
     description: >-
-      maximum elevation divergence allowed when measuring the same point using the
-      tracker's two different "facings" in decimal degrees
+      Maximum allowed elevation divergence (degrees) when measuring
+      the same point using the tracker's two different "facings".
     type: number
   two_face_range_tolerance:
     description: >-
-      maximum range divergence allowed when measuring the same point using the
-      tracker's two different "facings" in millimeters
+      Maximum allowed range divergence (mm) when measuring
+      the same point using the tracker's two different "facings".
     type: number
   rms_drift_tolerance:
-    description: RMS least squares tolerance in mm
+    description: RMS least squares tolerance (mm).
     type: number
   max_drift_tolerance:
-    description: maximum absolute tolerance  in mm
+    description: maximum absolute tolerance (mm).
     type: number
   power_lock:
-    description: if true, enables the tracker’s camera (used to help search for SMRs).
+    description: Enable the tracker’s camera? Used to help search for SMRs.
     type: boolean
   single_point_measurement_profile:
-    description: name of Spatial Analyzer measurement profile
+    description: Name of Spatial Analyzer measurement profile.
     type: string
 requiredProperties:
-  - t2sa_ip
+  - t2sa_host
   - t2sa_port
+  - read_timeout
+  - targets
   - num_iterations
   - num_samples
   - randomize_points

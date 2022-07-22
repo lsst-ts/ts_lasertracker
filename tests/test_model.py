@@ -24,6 +24,7 @@ import logging
 import unittest
 
 from lsst.ts import MTAlignment
+from lsst.ts.tcpip import LOCAL_HOST
 
 
 class ModelTestCase(unittest.IsolatedAsyncioTestCase):
@@ -52,7 +53,11 @@ class ModelTestCase(unittest.IsolatedAsyncioTestCase):
         Tests we can connect to the mock T2SA server
         """
         self.model = MTAlignment.AlignmentModel(
-            host="127.0.0.1", port=self.mock_t2sa.port
+            host=LOCAL_HOST,
+            port=self.mock_t2sa.port,
+            read_timeout=30,
+            simulation_mode=1,
+            log=self.log,
         )
         await self.model.connect()
         assert self.model.connected
@@ -64,7 +69,11 @@ class ModelTestCase(unittest.IsolatedAsyncioTestCase):
         Tests mock T2SA reports laser status as "on"
         """
         self.model = MTAlignment.AlignmentModel(
-            host="127.0.0.1", port=self.mock_t2sa.port
+            host=LOCAL_HOST,
+            port=self.mock_t2sa.port,
+            read_timeout=30,
+            simulation_mode=1,
+            log=self.log,
         )
         await self.model.connect()
         response = await self.model.send_command("?LSTA")
@@ -77,18 +86,22 @@ class ModelTestCase(unittest.IsolatedAsyncioTestCase):
         queries while the tracker is measuring return "EMP"
         """
         self.model = MTAlignment.AlignmentModel(
-            host="127.0.0.1", port=self.mock_t2sa.port
+            host=LOCAL_HOST,
+            port=self.mock_t2sa.port,
+            read_timeout=30,
+            simulation_mode=1,
+            log=self.log,
         )
         await self.model.connect()
-        self.log.debug("sending measurement commmand")
+        self.log.info("sending measurement commmand")
         response = await self.model.send_command("!CMDEXE:M1M3")
         assert response == "ACK300"
         assert self.mock_t2sa.measuring
-        self.log.debug("sending status check where we expect to receive EMP")
+        self.log.info("sending status check where we expect to receive EMP")
         response2 = await self.model.check_status()
         assert response2.strip() == "EMP"
         await asyncio.sleep(self.mock_t2sa.measurement_duration + 0.2)
-        self.log.debug("sending status check where we expect to receive READY")
+        self.log.info("sending status check where we expect to receive READY")
         response3 = await self.model.check_status()
         assert response3.strip() == "READY"
         await self.model.disconnect()

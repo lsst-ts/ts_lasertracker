@@ -22,8 +22,8 @@
 import logging
 import pathlib
 import unittest
-from lsst.ts import salobj
-from lsst.ts import MTAlignment
+
+from lsst.ts import MTAlignment, salobj
 
 STD_TIMEOUT = 15  # standard command timeout (sec)
 TEST_CONFIG_DIR = pathlib.Path(__file__).parent.joinpath("data", "config")

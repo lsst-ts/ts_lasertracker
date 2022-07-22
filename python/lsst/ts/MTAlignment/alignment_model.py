@@ -22,11 +22,12 @@
 __all__ = ["LaserStatus", "TrackerStatus", "T2SAError", "AlignmentModel"]
 
 import asyncio
-from enum import IntEnum
 import logging
 import re
+from enum import IntEnum
 
 from lsst.ts import tcpip
+
 from .mock_t2sa import MockT2SA
 
 LOCALHOST = "127.0.0.1"

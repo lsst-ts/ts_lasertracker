@@ -23,8 +23,7 @@ __all__ = ["MockT2SA"]
 
 import asyncio
 
-from lsst.ts import utils
-from lsst.ts import tcpip
+from lsst.ts import tcpip, utils
 
 # Good reply bodies. They should come after the initial "ACK-300 " in replies,
 # and thus are intended as arguments to `write_good_reply`.

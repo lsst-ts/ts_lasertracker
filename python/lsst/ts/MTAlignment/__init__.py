@@ -24,8 +24,8 @@ try:
 except ImportError:
     __version__ = "?"
 
+from .alignment_csc import *
+from .alignment_model import *
 from .config_schema import *
 from .errors import *
-from .alignment_model import *
-from .alignment_csc import *
 from .mock_t2sa import *

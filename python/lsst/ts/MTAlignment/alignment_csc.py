@@ -25,9 +25,10 @@ import asyncio
 import enum
 
 from lsst.ts import salobj
+
+from . import __version__
 from .alignment_model import AlignmentModel
 from .config_schema import CONFIG_SCHEMA
-from . import __version__
 
 
 class AlignmentDetailedState(enum.IntEnum):

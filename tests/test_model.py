@@ -1,8 +1,30 @@
+# This file is part of ts_MTAlignment.
+#
+# Developed for the Vera C. Rubin Observatory Telescope and Site Systems.
+# This product includes software developed by the LSST Project
+# (https://www.lsst.org).
+# See the COPYRIGHT file at the top-level directory of this distribution
+# for details of code ownership.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 import asyncio
 import logging
 import unittest
 
 from lsst.ts import MTAlignment
+from lsst.ts.tcpip import LOCAL_HOST
 
 
 class ModelTestCase(unittest.IsolatedAsyncioTestCase):
@@ -31,7 +53,11 @@ class ModelTestCase(unittest.IsolatedAsyncioTestCase):
         Tests we can connect to the mock T2SA server
         """
         self.model = MTAlignment.AlignmentModel(
-            host="127.0.0.1", port=self.mock_t2sa.port
+            host=LOCAL_HOST,
+            port=self.mock_t2sa.port,
+            read_timeout=30,
+            simulation_mode=1,
+            log=self.log,
         )
         await self.model.connect()
         assert self.model.connected
@@ -43,7 +69,11 @@ class ModelTestCase(unittest.IsolatedAsyncioTestCase):
         Tests mock T2SA reports laser status as "on"
         """
         self.model = MTAlignment.AlignmentModel(
-            host="127.0.0.1", port=self.mock_t2sa.port
+            host=LOCAL_HOST,
+            port=self.mock_t2sa.port,
+            read_timeout=30,
+            simulation_mode=1,
+            log=self.log,
         )
         await self.model.connect()
         response = await self.model.send_command("?LSTA")
@@ -56,18 +86,22 @@ class ModelTestCase(unittest.IsolatedAsyncioTestCase):
         queries while the tracker is measuring return "EMP"
         """
         self.model = MTAlignment.AlignmentModel(
-            host="127.0.0.1", port=self.mock_t2sa.port
+            host=LOCAL_HOST,
+            port=self.mock_t2sa.port,
+            read_timeout=30,
+            simulation_mode=1,
+            log=self.log,
         )
         await self.model.connect()
-        self.log.debug("sending measurement commmand")
+        self.log.info("sending measurement commmand")
         response = await self.model.send_command("!CMDEXE:M1M3")
         assert response == "ACK300"
         assert self.mock_t2sa.measuring
-        self.log.debug("sending status check where we expect to receive EMP")
+        self.log.info("sending status check where we expect to receive EMP")
         response2 = await self.model.check_status()
         assert response2.strip() == "EMP"
         await asyncio.sleep(self.mock_t2sa.measurement_duration + 0.2)
-        self.log.debug("sending status check where we expect to receive READY")
+        self.log.info("sending status check where we expect to receive READY")
         response3 = await self.model.check_status()
         assert response3.strip() == "READY"
         await self.model.disconnect()

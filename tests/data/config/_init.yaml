@@ -1,5 +1,10 @@
-t2sa_ip: "127.0.0.1"
+t2sa_host: "127.0.0.1"
 t2sa_port: 50000
+read_timeout: 30
+targets:
+  - CAM
+  - M1M3
+  - M2
 num_iterations: 1
 num_samples: 1
 randomize_points: false

@@ -1,12 +1,38 @@
-__all__ = ["AlignmentCSC", "run_mtalignment"]
+# This file is part of ts_MTAlignment.
+#
+# Developed for the Vera C. Rubin Observatory Telescope and Site Systems.
+# This product includes software developed by the LSST Project
+# (https://www.lsst.org).
+# See the COPYRIGHT file at the top-level directory of this distribution
+# for details of code ownership.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+__all__ = ["AlignmentDetailedState", "AlignmentCSC", "run_mtalignment"]
 
 import asyncio
 import enum
 
 from lsst.ts import salobj
+
+from . import __version__
 from .alignment_model import AlignmentModel
 from .config_schema import CONFIG_SCHEMA
-from . import __version__
+
+
+# The following targets must appear in config.targets
+REQUIRED_TARGETS = {"CAM", "M1M3", "M2"}
 
 
 class AlignmentDetailedState(enum.IntEnum):
@@ -90,8 +116,9 @@ class AlignmentCSC(salobj.ConfigurableCsc):
         if self.disabled_or_enabled:
             if self.model is None:
                 self.model = AlignmentModel(
-                    host=self.config.t2sa_ip,
+                    host=self.config.t2sa_host,
                     port=self.config.t2sa_port,
+                    read_timeout=self.config.read_timeout,
                     simulation_mode=self.simulation_mode,
                     log=self.log,
                 )
@@ -105,11 +132,16 @@ class AlignmentCSC(salobj.ConfigurableCsc):
                 self.model = None
 
     async def configure(self, config):
+        missing_targets = REQUIRED_TARGETS - set(config.targets)
+        if missing_targets:
+            raise RuntimeError(
+                f"config.targets is missing required targets {sorted(missing_targets)}"
+            )
         self.config = config
         if self.model is not None:
             if self.model.connected:
                 await self.model.disconnect()
-            await self.model.connect(self.config.t2sa_ip, self.config.t2sa_port)
+            await self.model.connect(self.config.t2sa_host, self.config.t2sa_port)
 
     @staticmethod
     def get_config_pkg():
@@ -120,16 +152,12 @@ class AlignmentCSC(salobj.ConfigurableCsc):
         """Measure and return coordinates of a target. Options are
         M1M3, M2, CAM, and DOME"""
         self.assert_enabled()
-        if data.target == "CAM":
-            await self.model.measure_cam()
-            result = await self.model.query_cam_position()
-        elif data.target == "M2":
-            await self.model.measure_m2()
-            result = await self.model.query_m2_position()
-        elif data.target == "M1M3":
-            self.log.debug("measure m1m3")
-            await self.model.measure_m1m3()
-            result = await self.model.query_m1m3_position()
+        if data.target not in self.config.targets:
+            raise salobj.ExpectedError(
+                f"Unknown target {data.target}; must one of {self.config.targets}"
+            )
+        await self.model.measure_target(data.target)
+        result = await self.model.get_target_position(data.target)
         self.log.debug(
             self.parse_offsets(result)
         )  # TODO publish an event with the measured coords
@@ -142,13 +170,13 @@ class AlignmentCSC(salobj.ConfigurableCsc):
     async def do_healthCheck(self, data):
         """run healthcheck script"""
         self.assert_enabled()
-        await self.model.twoFace_check()
+        await self.model.twoface_check()
         await self.model.measure_drift()
 
     async def do_laserPower(self, data):
         """put the laser in sleep state"""
         self.assert_enabled()
-        if data.laserPower == 0:
+        if data.power == 0:
             await self.model.laser_off()
         else:
             await self.model.laser_on()
@@ -168,7 +196,7 @@ class AlignmentCSC(salobj.ConfigurableCsc):
     async def do_pointDelta(self, data):
         """publish an event containing a vector between two points"""
         self.assert_enabled()
-        data = await self.model.query_point_delta(
+        data = await self.model.get_point_delta(
             data.collection_A,
             data.pointgroup_A,
             data.target_A,
@@ -224,18 +252,18 @@ class AlignmentCSC(salobj.ConfigurableCsc):
             self.elevation, self.azimuth, self.camrot
         )
 
-        await self.model.measure_m1m3()
+        await self.model.measure_target("M1M3")
         aligned = False
         loopcount = 1
         while not aligned:
             self.log.info(f"Loop iteration: {loopcount}")
-            await self.model.measure_cam()
-            await self.model.measure_m2()
+            await self.model.measure_target("CAM")
+            await self.model.measure_target("M2")
 
-            camOffset = self.parse_offsets(await self.model.query_cam_offset("CAM"))
-            m2Offset = self.parse_offsets(await self.model.query_m2_offset("M2"))
+            cam_offset = self.parse_offsets(await self.model.get_offset("CAM"))
+            m2_offset = self.parse_offsets(await self.model.get_offset("M2"))
 
-            if self.in_tolerance(camOffset) and self.in_tolerance(m2Offset):
+            if self.in_tolerance(cam_offset) and self.in_tolerance(m2_offset):
                 break
             elif loopcount >= self.max_iters:
                 break

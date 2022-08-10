@@ -141,7 +141,7 @@ class AlignmentCSC(salobj.ConfigurableCsc):
         if self.model is not None:
             if self.model.connected:
                 await self.model.disconnect()
-            await self.model.connect(self.config.t2sa_host, self.config.t2sa_port)
+            await self.model.connect()
 
     @staticmethod
     def get_config_pkg():
@@ -162,10 +162,18 @@ class AlignmentCSC(salobj.ConfigurableCsc):
             self.parse_offsets(result)
         )  # TODO publish an event with the measured coords
         self.last_measurement = self.parse_offsets(result)
+        await self.evt_positionPublish.set_write(target=self.last_measurement["RefFrame"],
+          dX=self.last_measurement["X"],
+          dY=self.last_measurement["Y"],
+          dZ=self.last_measurement["Z"],
+          dRX=self.last_measurement["Rx"],
+          dRY=self.last_measurement["Ry"],
+          dRZ=self.last_measurement["Rz"])
 
     async def do_align(self, data):
         """Perform correction loop"""
         self.assert_enabled()
+        await self.model.align()
 
     async def do_healthCheck(self, data):
         """run healthcheck script"""
@@ -215,7 +223,7 @@ class AlignmentCSC(salobj.ConfigurableCsc):
         """attempt to set the passed string as the SpatialAnalyzer working
         frame"""
         self.assert_enabled()
-        await self.model.set_working_frame(data.workingframe)
+        await self.model.set_working_frame(data.workingFrame)
 
     async def do_halt(self, data):
         """halts any executing measurement plan and returns to ready state"""
@@ -226,12 +234,12 @@ class AlignmentCSC(salobj.ConfigurableCsc):
         """SA Template file path and name. This is in the filesystem on the
         T2SA host."""
         self.assert_enabled()
-        await self.model.load_template_file(data.filepath)
+        await self.model.load_template_file(data.file)
 
     async def do_measureDrift(self, data):
         """measure tracker drift"""
         self.assert_enabled()
-        await self.model.measure_drift()
+        await self.model.measure_drift(data.pointgroup)
 
     async def do_resetT2SA(self, data):
         """reboots t2sa and SA"""
@@ -241,11 +249,12 @@ class AlignmentCSC(salobj.ConfigurableCsc):
     async def do_newStation(self, data):
         """create new tracker station"""
         self.assert_enabled()
-        await self.model.new_station()
+        await self.model.new_station(data.newStation)
 
     async def do_saveJobfile(self, data):
         """save job file"""
         self.assert_enabled()
+        await self.model.save_sa_jobfile(data.file)
 
     async def correction_loop(self):
         await self.model.set_telescope_position(
@@ -260,8 +269,8 @@ class AlignmentCSC(salobj.ConfigurableCsc):
             await self.model.measure_target("CAM")
             await self.model.measure_target("M2")
 
-            cam_offset = self.parse_offsets(await self.model.get_offset("CAM"))
-            m2_offset = self.parse_offsets(await self.model.get_offset("M2"))
+            cam_offset = self.parse_offsets(await self.model.get_target_offset("CAM"))
+            m2_offset = self.parse_offsets(await self.model.get_target_offset("M2"))
 
             if self.in_tolerance(cam_offset) and self.in_tolerance(m2_offset):
                 break
@@ -292,7 +301,7 @@ class AlignmentCSC(salobj.ConfigurableCsc):
         coordsDict = {}
         try:
             # ref frame
-            coordsDict[bits[0][0]] = bits[0][1]
+            coordsDict["RefFrame"] = bits[0][1]
 
             # coords
             for s in bits[1:7]:

@@ -162,13 +162,15 @@ class AlignmentCSC(salobj.ConfigurableCsc):
             self.parse_offsets(result)
         )  # TODO publish an event with the measured coords
         self.last_measurement = self.parse_offsets(result)
-        await self.evt_positionPublish.set_write(target=self.last_measurement["RefFrame"],
-          dX=self.last_measurement["X"],
-          dY=self.last_measurement["Y"],
-          dZ=self.last_measurement["Z"],
-          dRX=self.last_measurement["Rx"],
-          dRY=self.last_measurement["Ry"],
-          dRZ=self.last_measurement["Rz"])
+        await self.evt_positionPublish.set_write(
+            target=self.last_measurement["RefFrame"],
+            dX=self.last_measurement["X"],
+            dY=self.last_measurement["Y"],
+            dZ=self.last_measurement["Z"],
+            dRX=self.last_measurement["Rx"],
+            dRY=self.last_measurement["Ry"],
+            dRZ=self.last_measurement["Rz"],
+        )
 
     async def do_align(self, data):
         """Perform correction loop"""

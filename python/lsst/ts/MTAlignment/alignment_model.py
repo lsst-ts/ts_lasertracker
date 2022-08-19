@@ -250,7 +250,7 @@ class AlignmentModel:
                 f"Timed out while waiting for a reply to command {cmd}; disconnecting"
             )
             self.log.error(err_msg)
-            await self.handle_lost_connection()
+            # await self.handle_lost_connection()
             raise RuntimeError(err_msg)
 
         reply_str = reply_bytes.decode().strip()

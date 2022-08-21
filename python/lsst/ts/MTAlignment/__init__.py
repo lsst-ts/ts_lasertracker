@@ -28,6 +28,5 @@ from .alignment_csc import *
 from .alignment_model import *
 from .config_schema import *
 from .errors import *
-from .mock_t2sa import *
 from .mock import *
 from .utils import *

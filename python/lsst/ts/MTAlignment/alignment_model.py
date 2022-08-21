@@ -28,7 +28,7 @@ from enum import IntEnum
 
 from lsst.ts import tcpip
 
-from .mock_t2sa import MockT2SA
+from .mock.mock_t2sa import MockT2SA
 
 # Log a warning if it takes longer than this (seconds) to read a reply
 LOG_WARNING_TIMEOUT = 5

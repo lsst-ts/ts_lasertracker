@@ -6,6 +6,23 @@
 Version History
 ###############
 
+v0.4.0
+------
+
+* Update for improved T2SA API which changes the EMP reply to a standard ERR reply and deletes the colon after ERR-xxx.
+* Refine `AlignmentModel`:
+
+  * Modify ``send_command`` to raises T2SAError if the system is busy.
+    This is the natural thing to do, now that the T2SA reports busy as a standard error.
+  * Rename ``check_status`` to ``get_status`` and update it as follows:
+
+    * Return "BUSY" if busy (instead of "EMP", the old, confusing value).
+    * Add an optional ``do_lock`` argument, so it can be called by ``wait_for_ready``.
+
+* Update `T2SAErrorCode` enum with latest error codes and names provided by the T2SA vendor.
+* Update `MockT2SA` to report approximately correct error codes.
+  It is more work than it's worth to get them exactly right, and the CSC ignores the codes, other than checking for CommandRejectedBusy.
+
 v0.3.0
 ------
 

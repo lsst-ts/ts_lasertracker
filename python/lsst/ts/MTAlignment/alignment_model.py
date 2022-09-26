@@ -22,13 +22,17 @@
 __all__ = ["LaserStatus", "TrackerStatus", "T2SAError", "AlignmentModel"]
 
 import asyncio
+import logging
 import re
 import time
 from enum import IntEnum
 
 from lsst.ts import tcpip
-
-from .mock_t2sa import MockT2SA
+from lsst.ts.MTAlignment.utils import (
+    CartesianCoordinate,
+    parse_offsets,
+    parse_single_point_measurement,
+)
 
 # Log a warning if it takes longer than this (seconds) to read a reply
 LOG_WARNING_TIMEOUT = 5
@@ -52,7 +56,7 @@ class TrackerStatus(IntEnum):
 class T2SAError(Exception):
     """Error raised by send_command if the T2SA returns an error."""
 
-    def __init__(self, error_code, message):
+    def __init__(self, error_code: str, message: str) -> None:
         super().__init__(message)
         self.error_code = error_code
 
@@ -62,57 +66,50 @@ class AlignmentModel:
 
     Parameters
     ----------
-    addr : str
+    addr : `str`
         T2SA IP address.
-    port : int
+    port : `int`
         T2SA port.
-    read_timeout : float
+    read_timeout : `float`
         Timeout for reading replies to commands (seconds).
-    simulation_mode : int
-        Simulation mode. One of:
-
-        * 0: normal mode
-        * 1: run the T2SA in simulation mode.
-        * 2: run a local minimal T2SA simulator.
-
-    log : logging.Logger
+    t2sa_simulation_mode : `bool`
+        The T2SA controller has an internal simulation mode. If `True` enable
+        simulation mode after establishing a connection.
+    log : `logging.Logger`
         Logger.
     """
 
-    def __init__(self, host, port, read_timeout, simulation_mode, log):
+    def __init__(
+        self,
+        host: str,
+        port: int,
+        read_timeout: float,
+        t2sa_simulation_mode: bool,
+        log: logging.Logger,
+    ) -> None:
         self.host = host
         self.port = port
         self.read_timeout = read_timeout
-        self.simulation_mode = simulation_mode
-        self.log = log
+        self.t2sa_simulation_mode = t2sa_simulation_mode
+        self.log = log.getChild("AlignmentModel")
 
-        self.reader = None
-        self.writer = None
+        self.reader: None | asyncio.StreamReader = None
+        self.writer: None | asyncio.StreamWriter = None
         self.first_measurement = True
-        self.t2sa_simulation_mode_set = False
         self.comm_lock = asyncio.Lock()
         self.reply_regex = re.compile(r"(ACK|ERR)-(\d\d\d):? +(.*)")
 
-    async def connect(self):
+    async def connect(self) -> None:
         """Connect to the T2SA.
 
-        Create a mock T2SA for simulation mode 2.
+        After the connection is established, set the t2sa simulation mode, this
+        is the t2sa controller own simulation mode.
         """
-        if self.simulation_mode == 2:
-            self.mock_t2sa = MockT2SA(port=0, log=self.log)
-            await self.mock_t2sa.start_task
-            self.port = self.mock_t2sa.port
-            self.host = tcpip.LOCAL_HOST
-            self.log.debug(f"Connecting to mock T2SA at {self.host}:{self.port}")
-            t2sa_simulation_mode = 1
-        else:
-            self.log.debug(f"Connecting to real T2SA at {self.host}:{self.port}")
-            t2sa_simulation_mode = 0
         self.reader, self.writer = await asyncio.open_connection(self.host, self.port)
-        await self.set_simulation_mode(t2sa_simulation_mode)
+        await self.set_t2sa_simulation_mode()
 
     @property
-    def connected(self):
+    def connected(self) -> bool:
         """Return True if connected."""
         return not (
             self.reader is None
@@ -121,12 +118,18 @@ class AlignmentModel:
             or self.writer.is_closing()
         )
 
-    async def disconnect(self):
+    async def disconnect(self) -> None:
         """Disconnect from the T2SA. A no-op if not connected."""
         if self.writer is not None:
-            await tcpip.close_stream_writer(self.writer)
+            try:
+                await self.reset_t2sa_simulation_mode()
+            except Exception:
+                self.log.exception("Failed to reset t2sa simulation mode. Ignoring.")
+            finally:
+                await tcpip.close_stream_writer(self.writer)
+                self.writer = None
 
-    async def wait_for_ready(self):
+    async def wait_for_ready(self) -> None:
         """Wait for the tracker to report ready.
 
         You must obtain self.comm_lock before calling this.
@@ -153,12 +156,12 @@ class AlignmentModel:
             # but in fact we see many other replies as well,
             # so accept and ignore any OK reply that is not READY...
 
-    async def handle_lost_connection(self):
+    async def handle_lost_connection(self) -> None:
         """Handle a connection that is unexpectedly lost."""
         if self.writer is not None:
             await tcpip.close_stream_writer(self.writer)
 
-    async def send_command(self, cmd, wait_for_ready=False):
+    async def send_command(self, cmd: str, wait_for_ready: bool = False) -> str:
         """Send a command and return the reply.
 
         Parameters
@@ -186,7 +189,7 @@ class AlignmentModel:
                 await self.wait_for_ready()
             return await self._basic_send_command(cmd)
 
-    async def _basic_send_command(self, cmd):
+    async def _basic_send_command(self, cmd: str) -> str:
         """Send a command and return the reply, without locking.
 
         You must obtain self.comm_lock before calling.
@@ -221,6 +224,10 @@ class AlignmentModel:
             raise RuntimeError("You must obtain the command lock first")
         if not self.connected:
             raise RuntimeError("Not connected")
+
+        assert self.writer is not None
+        assert self.reader is not None
+
         cmd_bytes = cmd.encode() + tcpip.TERMINATOR
         self.log.debug(f"Send command {cmd_bytes!r}")
         self.writer.write(cmd_bytes)
@@ -264,12 +271,12 @@ class AlignmentModel:
             return reply_body
         raise T2SAError(error_code=reply_code, message=reply_body)
 
-    async def check_status(self):
+    async def check_status(self) -> str:
         """Query T2SA for status.
 
         Returns
         -------
-        status : str
+        status : `str`
             May include:
 
             * READY if tracker is ready
@@ -279,12 +286,12 @@ class AlignmentModel:
         """
         return await self.send_command("?STAT")
 
-    async def laser_status(self):
+    async def laser_status(self) -> str:
         """Get laser status.
 
         Returns
         -------
-        status : str
+        status : `str`
             Status may include:
 
             * LON if laser is on
@@ -292,47 +299,47 @@ class AlignmentModel:
         """
         return await self.send_command("?LSTA")
 
-    async def laser_on(self):
+    async def laser_on(self) -> str:
         """Turn the tracker laser on (to warm it up).
 
         Returns
         -------
-        reply : str
+        reply : `str`
             ACK300 on success
         """
         return await self.send_command("!LST:1")
 
-    async def laser_off(self):
+    async def laser_off(self) -> str:
         """Turn the tracker laser off.
 
         Returns
         -------
-        reply : str
+        reply : `str`
             ACK300 on success
         """
         return await self.send_command("!LST:0")
 
-    async def set_simulation_mode(self, simulation_mode):
-        """Set the T2SA's simulation mode.
-
-        Parameters
-        ----------
-        simulation_mode : int
-            Simulation mode; must be one of:
-
-            * 0 normal mode
-            * 1 simulation mode
+    async def set_t2sa_simulation_mode(self) -> str:
+        """Set the T2SA's simulation mode the appropriate value.
 
         Returns
         -------
-        reply : str
+        reply : `str`
             ACK300 on success
         """
-        if simulation_mode not in (0, 1):
-            raise ValueError(f"simulation_mode={simulation_mode} must be 0 or 1")
-        return await self.send_command(f"!SET_SIM:{simulation_mode}")
+        return await self.send_command(f"!SET_SIM:{int(self.t2sa_simulation_mode)}")
 
-    async def tracker_off(self):
+    async def reset_t2sa_simulation_mode(self) -> str:
+        """Reset T2SA's simulation mode to 0.
+
+        Returns
+        -------
+        reply : `str`
+            ACK300 on success
+        """
+        return await self.send_command("!SET_SIM:0")
+
+    async def tracker_off(self) -> str:
         """Completely shut down the T2SA.
 
         Warning: if you issue this command then you must turn
@@ -340,71 +347,82 @@ class AlignmentModel:
 
         Returns
         -------
-        reply : str
+        reply : `str`
             ACK300 on success
         """
         return await self.send_command("!LST:2")
 
-    async def measure_target(self, target):
+    async def measure_target(self, target: str) -> str:
         """Execute a measurement plan.
 
         Parameters
         ----------
-        target : str
+        target : `str`
             Target name, e.g. "M1".
 
         Returns
         -------
-        reply : str
+        reply : `str`
             ACK300 on success
         """
         return await self.send_command(f"!CMDEXE:{target}", wait_for_ready=True)
 
-    async def get_target_position(self, target):
+    async def get_target_position(self, target: str) -> dict[str, str | float]:
         """Get the position of the specified target.
 
-                You should measure the point using `measure_target`
-                before calling this. You may also wish to set the
-                current working frame first, by calling `set_working_frame`.
+        You should measure the point using `measure_target` before calling
+        this. You may also wish to set the current working frame first, by
+        calling `set_working_frame`.
 
-        `        Parameters
-                ----------
-                target : str
-                    Target name, e.g. "M1".
+        Parameters
+        ----------
+        target : `str`
+            Target name, e.g. "M1".
 
-                Returns
-                -------
-                position : str
-                    Position of target, as a point coordinate string,
-                    relative to the current working frame.
+        Returns
+        -------
+        target_position : `dict` [`str`, `str` | `float`]
+            Position of target, as a point coordinate string, relative to the
+            current working frame.
+
+        Raises
+        ------
+        RuntimeError
+            If fail to parse response from controller.
         """
-        return await self.send_command(f"?POS {target}")
+        target_position_response = await self.send_command(f"?POS {target}")
 
-    async def get_point_position(self, pointgroup, point, collection="A"):
+        return parse_offsets(target_position_response)
+
+    async def get_point_position(
+        self, pointgroup: str, point: str, collection: str = "A"
+    ) -> str:
         """Get the position of a previously measured point.
 
         Parameters
         ----------
-        pointgroup : String
+        pointgroup : `str`
             Name of pointgroup the point is in.
-        point : String
+        point : `str`
             Name of point.
-        collection : String
+        collection : `str`
             Name of collection the point is in. Default "A"
 
         Returns
         -------
-        position : str
+        position : `str`
             Point coordinate string
         """
         return await self.send_command(f"?POINT_POS:{collection};{pointgroup};{point}")
 
-    async def get_target_offset(self, target, reference_pointgroup=None):
+    async def get_target_offset(
+        self, target: str, reference_pointgroup: None | str = None
+    ) -> dict[str, str | float]:
         """Get the offset of a target from nominal.
 
         Parameters
         ----------
-        target : str
+        target : `str`
             Target name, e.g. "M1".
         reference_pointgroup : `None` | `str`
             Name of pointgroup that will be used as the frame of reference for
@@ -412,31 +430,47 @@ class AlignmentModel:
 
         Returns
         -------
-        position : str
-            Offset of target.
+        target_offset : `dict` [`str`, `str` | `float`]
+            Target offset information.
+
+        Raise
+        -----
+        RuntimeError
+            If failed to parse response from controller.
         """
         if reference_pointgroup is None:
             reference_pointgroup = target
-        return await self.send_command(f"?OFFSET:{reference_pointgroup};{target}")
+
+        target_offset_response = await self.send_command(
+            f"?OFFSET:{reference_pointgroup};{target}"
+        )
+
+        return parse_offsets(target_offset_response)
 
     async def get_point_delta(
-        self, p1group, p1, p2group, p2, p1collection="A", p2collection="A"
-    ):
+        self,
+        p1group: str,
+        p1: str,
+        p2group: str,
+        p2: str,
+        p1collection: str = "A",
+        p2collection: str = "A",
+    ) -> str:
         """Get the offset between two points.
 
         Parameters
         ----------
-        p1group : String
+        p1group : `str`
             Name of pointgroup the point 1 is in
-        p1 : String
+        p1 : `str`
             Name of point 1
-        p1collection : String
+        p1collection : `str`
             name of collection point 1 is in. Default "A"
-        p2group : String
+        p2group : `str`
             Name of pointgroup the point 2 is in
-        p2 : String
+        p2 : `str`
             Name of point 2
-        p2collection : String
+        p2collection : `str`
             name of collection point 2 is in. Default "A"
 
         Returns
@@ -447,21 +481,20 @@ class AlignmentModel:
             f"?POINT_DELTA:{p1collection};{p1group};{p1};{p2collection};{p2group};{p2}"
         )
 
-    async def clear_errors(self):
-        """
-        Clear errors, or return a -300 if we cant clear them
-        This may be deprecated soon
-        """
+    async def clear_errors(self) -> str:
+        """Clear errors, or return a -300 if it can not be cleared.
 
+        This may be deprecated soon.
+        """
         return await self.send_command("!CLERCL")
 
-    async def set_randomize_points(self, randomize_points):
-        """
-        Measure the points in the SpatialAnalyzer database in a random order
+    async def set_randomize_points(self, randomize_points: bool) -> str:
+        """Measure the points in the SpatialAnalyzer database in a random
+        order.
 
         Parameters
         ----------
-        randomize_points : Boolean
+        randomize_points : `bool`
             True to randomize point order
 
         Returns
@@ -471,14 +504,13 @@ class AlignmentModel:
         value = 1 if randomize_points else 0
         return await self.send_command(f"SET_RANDOMIZE_POINTS:{value}")
 
-    async def set_power_lock(self, power_lock):
-        """
-        enable/disable the Tracker's IR camera which helps it find SMRs, but
+    async def set_power_lock(self, power_lock: bool) -> str:
+        """Enable/disable the Tracker's IR camera which helps it find SMRs, but
         can also cause it to lock on to the wrong one sometimes.
 
         Parameters
         ----------
-        power_lock : Boolean
+        power_lock : `bool`
             True to enable the IR camera assist
 
         Returns
@@ -488,7 +520,7 @@ class AlignmentModel:
         value = 1 if power_lock else 0
         return await self.send_command(f"SET_POWER_LOCK:{value}")
 
-    async def twoface_check(self, pointgroup):
+    async def twoface_check(self, pointgroup: str) -> str:
         """Run the 2 face check against a given point group.
 
         Parameters
@@ -502,7 +534,7 @@ class AlignmentModel:
         """
         return await self.send_command(f"!2FACE_CHECK:{pointgroup}")
 
-    async def measure_drift(self, pointgroup):
+    async def measure_drift(self, pointgroup: str) -> str:
         """Measure drift relative to a nominal point group.
 
         Parameters
@@ -516,7 +548,9 @@ class AlignmentModel:
         """
         return await self.send_command(f"!MEAS_DRIFT:{pointgroup}")
 
-    async def measure_single_point(self, collection, pointgroup, target):
+    async def measure_single_point(
+        self, collection: str, pointgroup: str, target: str
+    ) -> CartesianCoordinate:
         """Measure a single point for a specified target.
 
         Point at the target, lock on, and start measuring the target
@@ -524,6 +558,8 @@ class AlignmentModel:
 
         Parameters
         ----------
+        collection : `str`
+            An id for the data collection group.
         pointgroup : `str`
             Name of the point group that contains the target point.
         target : `str`
@@ -531,13 +567,21 @@ class AlignmentModel:
 
         Returns
         -------
-        ACK300 or ERR code
+        single_point_measurement : `CartesianCoordinate`
+            Single point measurement values in a cartesian coordinate format.
+
+        Raises
+        ------
+        RuntimeError
+            If fail to parse response from controller.
         """
-        return await self.send_command(
+        single_point_response = await self.send_command(
             f"!MEAS_SINGLE_POINT:{collection};{pointgroup};{target}"
         )
 
-    async def single_point_measurement_profile(self, profile):
+        return parse_single_point_measurement(single_point_response)
+
+    async def single_point_measurement_profile(self, profile: str) -> str:
         """Set a measurement profile in the spatial analyzer.
 
         Parameters
@@ -551,7 +595,7 @@ class AlignmentModel:
         """
         return await self.send_command(f"!SINGLE_POINT_MEAS_PROFILE:{profile}")
 
-    async def generate_report(self, reportname):
+    async def generate_report(self, reportname: str) -> str:
         """Generate a report.
 
         Parameters
@@ -565,9 +609,11 @@ class AlignmentModel:
         """
         return await self.send_command(f"!GEN_REPORT:{reportname}")
 
-    async def set_twoface_tolerances(self, az_tol, el_tol, range_tol):
-        """Set maximum allowed divergences when measuring
-        the same point using the tracker's two different "facings".
+    async def set_twoface_tolerances(
+        self, az_tol: float, el_tol: float, range_tol: float
+    ) -> str:
+        """Set maximum allowed divergences when measuring the same point using
+        the tracker's two different "facings".
 
         Parameters
         ----------
@@ -584,7 +630,7 @@ class AlignmentModel:
         """
         return await self.send_command(f"!SET_2FACE_TOL:{az_tol};{el_tol};{range_tol}")
 
-    async def set_drift_tolerance(self, rms_tol, max_tol):
+    async def set_drift_tolerance(self, rms_tol: float, max_tol: float) -> str:
         """Set drift tolerance.
 
         rms_tol default 0.050 mm
@@ -603,7 +649,7 @@ class AlignmentModel:
         """
         return await self.send_command(f"!SET_DRIFT_TOL:{rms_tol};{max_tol}")
 
-    async def set_ls_tolerance(self, rms_tol, max_tol):
+    async def set_ls_tolerance(self, rms_tol: float, max_tol: float) -> str:
         """Set the least-squares tolerance.
 
         Parameters
@@ -619,7 +665,7 @@ class AlignmentModel:
         """
         return await self.send_command(f"!SET_LS_TOL:{rms_tol};{max_tol}")
 
-    async def load_template_file(self, filepath):
+    async def load_template_file(self, filepath: str) -> str:
         """Load a template file.
 
         Parameters
@@ -631,9 +677,9 @@ class AlignmentModel:
         -------
         ACK300 or ERR code
         """
-        return await self.send_command(f"!LOAD_SA_TEMPLATE_FILE;{filepath}")
+        return await self.send_command(f"!LOAD_SA_TEMPLATE_FILE:{filepath}")
 
-    async def set_reference_group(self, pointgroup):
+    async def set_reference_group(self, pointgroup: str) -> str:
         """Set nominal point group to locate station to and provide
         data relative to.
 
@@ -648,7 +694,7 @@ class AlignmentModel:
         """
         return await self.send_command(f"!SET_REFERENCE_GROUP:{pointgroup}")
 
-    async def set_working_frame(self, workingframe):
+    async def set_working_frame(self, workingframe: str) -> str:
         """Set the working frame.
 
         This is the frame whose coordinate system all coordinates will be
@@ -665,7 +711,7 @@ class AlignmentModel:
         """
         return await self.send_command(f"!SET_WORKING_FRAME:{workingframe}")
 
-    async def new_station(self):
+    async def new_station(self) -> str:
         """Add a new station and make it the active instrument.
 
         Returns
@@ -674,7 +720,7 @@ class AlignmentModel:
         """
         return await self.send_command("!NEW_STATION")
 
-    async def save_sa_jobfile(self, filepath):
+    async def save_sa_jobfile(self, filepath: str) -> str:
         """Save a jobfile
 
         Parameters
@@ -686,15 +732,15 @@ class AlignmentModel:
         -------
         ACK300 or ERR code
         """
-        return await self.send_command(f"!SAVE_SA_JOBFILE;{filepath}")
+        return await self.send_command(f"!SAVE_SA_JOBFILE:{filepath}")
 
-    async def set_station_lock(self, station_locked):
+    async def set_station_lock(self, station_locked: bool) -> str:
         """Control whether the spatial analyzer automatically changes stations
         when it detects that the tracker has drifted.
 
         Parameters
         ----------
-        station_locked : `Boolean`
+        station_locked : `bool`
             If True then do not change stations.
 
         Returns
@@ -704,7 +750,7 @@ class AlignmentModel:
         value = 1 if station_locked else 0
         return await self.send_command(f"!SET_STATION_LOCK:{value}")
 
-    async def reset_t2sa(self):
+    async def reset_t2sa(self) -> str:
         """Reboot the T2SA and spatial analyzer components.
 
         Returns
@@ -713,7 +759,7 @@ class AlignmentModel:
         """
         return await self.send_command("!RESET_T2SA")
 
-    async def halt(self):
+    async def halt(self) -> str:
         """Halt the current measurement plan, if any,
         and return to ready state.
 
@@ -723,7 +769,9 @@ class AlignmentModel:
         """
         return await self.send_command("!HALT")
 
-    async def set_telescope_position(self, telalt, telaz, camrot):
+    async def set_telescope_position(
+        self, telalt: float, telaz: float, camrot: float
+    ) -> str:
         """Tell the T2SA the telescope's current position and camera
         rotation angle.
 
@@ -744,7 +792,7 @@ class AlignmentModel:
         """
         return await self.send_command(f"!PUBLISH_ALT_AZ_ROT:{telalt};{telaz};{camrot}")
 
-    async def set_num_samples(self, numsamples):
+    async def set_num_samples(self, numsamples: int) -> str:
         """Set the number of tracker samples per point.
 
         These samples are averaged to make a single measurement.
@@ -760,13 +808,13 @@ class AlignmentModel:
         """
         return await self.send_command(f"SET_NUM_SAMPLES:{numsamples}")
 
-    async def set_num_iterations(self, numiters):
+    async def set_num_iterations(self, numiters: int) -> str:
         """Set the number of times to repeat an automatic measurement
         of a point group.
 
         Parameters
         ----------
-        numiters : `Int`
+        numiters : `int`
             number of iterations
 
         Returns
@@ -775,14 +823,14 @@ class AlignmentModel:
         """
         return await self.send_command(f"SET_NUM_ITERATIONS:{numiters}")
 
-    async def increment_measured_index(self, inc=1):
+    async def increment_measured_index(self, inc: int = 1) -> str:
         """Set the amount by which to increment the measurement point
         group index.
 
         Parameters
         ----------
-        inc : `Int`
-            increment amount
+        inc : `int`
+            Increment amount
 
         Returns
         -------
@@ -790,13 +838,13 @@ class AlignmentModel:
         """
         return await self.send_command(f"INC_MEAS_INDEX:{inc}")
 
-    async def set_measured_index(self, idx):
+    async def set_measured_index(self, idx: int) -> str:
         """Set the measured point group index.
 
         Parameters
         ----------
-        idx : `Int`
-            index
+        idx : `int`
+            Index
 
         Returns
         -------
@@ -806,7 +854,7 @@ class AlignmentModel:
         cmd = f"SET_MEAS_INDEX:{idx}"
         return await self.send_command(cmd)
 
-    async def save_settings(self):
+    async def save_settings(self) -> str:
         """Save the current settings.
 
         Returns
@@ -815,12 +863,12 @@ class AlignmentModel:
         """
         return await self.send_command("!SAVE_SETTINGS")
 
-    async def load_tracker_compensation(self, compfile):
+    async def load_tracker_compensation(self, compfile: str) -> str:
         """Load a tracker compensation file
 
         Parameters
         ----------
-        compfile : `String`
+        compfile : `str`
             name and  filepath to compensation profile file
 
         Returns

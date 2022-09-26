@@ -18,6 +18,7 @@ test:
     - ts-idl {{ idl_version }}
     - ts-salobj {{ salobj_version }}
     - ts-tcpip
+    - scipy
   source_files:
     - python
     - tests
@@ -44,4 +45,4 @@ requirements:
     - ts-salobj
     - ts-idl
     - ts-tcpip
-
+    - scipy

@@ -28,6 +28,7 @@ import typing
 
 from lsst.ts import tcpip, utils
 
+from ..enums import T2SAErrorCode
 from .mock_utils import OPTIMAL_POSITION, TelescopePosition, get_random_initial_position
 
 # Good reply bodies. They should come after the initial "ACK-300 " in replies,
@@ -36,6 +37,10 @@ ALREADY_MEASURING_REPLY = "ACK000"
 OK_REPLY = "ACK300"  # Command was accepted
 T2SA_STATUS_READY = "READY"
 T2SA_REPLY_READY = "READY"
+
+# Special status string for busy; may be any reasonable value
+# that does not match a non-busy status.
+BUSY_STATUS = "_BUSY_"
 
 
 class MockT2SA(tcpip.OneClientServer):
@@ -180,6 +185,7 @@ class MockT2SA(tcpip.OneClientServer):
 
     @property
     def reference_frame(self) -> str:
+        """Get the reference frame, formatted for output."""
         return f"FRAME{self._reference_group}"
 
     def is_measuring(self) -> bool:
@@ -216,7 +222,7 @@ class MockT2SA(tcpip.OneClientServer):
             return T2SA_REPLY_READY
 
     async def execute_drift(self, point_group: str) -> None:
-        """Pretend to execute two face check.
+        """Simulate a drift measurement.
 
         Parameters
         ----------
@@ -226,7 +232,7 @@ class MockT2SA(tcpip.OneClientServer):
         await self._execute_action("DRIFT", point_group)
 
     async def execute_two_face_check(self, point_group: str) -> None:
-        """Pretend to execute two face check.
+        """Simulate a two face check.
 
         Parameters
         ----------
@@ -236,7 +242,7 @@ class MockT2SA(tcpip.OneClientServer):
         await self._execute_action("2FACE", point_group)
 
     async def execute_measure_plan(self, point_group: str) -> None:
-        """Pretend to execute a measurement plan.
+        """Simulate a measurement plan.
 
         Acknowledge the request to measure, then pretend to measure.
 
@@ -245,7 +251,7 @@ class MockT2SA(tcpip.OneClientServer):
         point_group : `str`
             Point group to measure (e.g. M1M3, M2, CAM).
         """
-        await self._execute_action("EMP", point_group)
+        await self._execute_action(BUSY_STATUS, point_group)
 
     async def execute_halt(self) -> None:
         """Halt any ongoing measurement."""
@@ -262,7 +268,7 @@ class MockT2SA(tcpip.OneClientServer):
         await self.write_good_reply(self.t2sa_status)
 
     async def execute_load_sa_template_file(self, file_path: str) -> None:
-        """Pretend to load an SA Template File.
+        """Simulate loading an SA Template File.
 
         Parameters
         ----------
@@ -275,10 +281,13 @@ class MockT2SA(tcpip.OneClientServer):
         if file_path.startswith(sa_template_dir) and file_path.endswith(".xit64"):
             await self.write_good_reply(T2SA_REPLY_READY)
         else:
-            await self.write_error_reply("SA Template file not found or loaded.")
+            await self.write_error_reply(
+                T2SAErrorCode.SATemplateFileNotFound,
+                "SA Template file not found or loaded.",
+            )
 
     async def _execute_action(self, action: str, point_group: str) -> None:
-        """Pretend to execute a certain action.
+        """Simulate a certain action.
 
         Parameters
         ----------
@@ -294,19 +303,28 @@ class MockT2SA(tcpip.OneClientServer):
             await self.write_good_reply(ALREADY_MEASURING_REPLY)
         elif not self.is_ready():
             await self.write_error_reply(
-                f"T2SA not ready: {self.get_readiness_status()}."
+                T2SAErrorCode.CommandRejected,
+                f"T2SA not ready: {self.get_readiness_status()}.",
             )
         elif point_group.lower() not in self.position_optimum:
-            await self.write_error_reply(f"No point group {point_group}.")
+            await self.write_error_reply(
+                T2SAErrorCode.DidFindOrSetPointGroupAndTargetName,
+                f"No point group {point_group}.",
+            )
         else:
             self.t2sa_status = action
             self.measure_task = asyncio.create_task(self.measure())
             await self.write_good_reply(OK_REPLY)
 
     async def execute_write_status(self) -> None:
-        """Reply with current status."""
+        """Write current status."""
 
-        await self.write_good_reply(self.t2sa_status)
+        if self.t2sa_status == BUSY_STATUS:
+            await self.write_error_reply(
+                T2SAErrorCode.CommandRejectedBusy, "Command rejected. SA is busy."
+            )
+        else:
+            await self.write_good_reply(self.t2sa_status)
 
     async def execute_write_point_group_position_m1m3(self) -> None:
         """Write the point group position for m1m3."""
@@ -321,7 +339,7 @@ class MockT2SA(tcpip.OneClientServer):
         await self.write_point_group_position("cam")
 
     async def write_point_group_position(self, point_group: str) -> None:
-        """Reply with the input point group position.
+        """Write the input point group position.
 
         Parameters
         ----------
@@ -330,20 +348,27 @@ class MockT2SA(tcpip.OneClientServer):
         """
 
         if self.is_measuring():
-            await self.write_error_reply("Ongoing measurements.")
+            await self.write_error_reply(
+                T2SAErrorCode.CommandRejected, "Command rejected. SA is busy."
+            )
         elif self.measure_task.cancelled():
-            await self.write_error_reply("Measurement failed.")
+            await self.write_error_reply(
+                T2SAErrorCode.FailedPointGroupMeasurement, "Measurement failed."
+            )
         else:
             point_group_name = point_group.lower()
             if point_group_name not in self.position_current:
-                await self.write_error_reply(f"No point group {point_group_name}.")
+                await self.write_error_reply(
+                    T2SAErrorCode.DidFindOrSetPointGroupAndTargetName,
+                    f"No point group {point_group_name}.",
+                )
             else:
                 await self._write_position(body_name=point_group_name)
 
     async def execute_write_point_group_offset(
         self, reference_group: str, point_group: str
     ) -> None:
-        """Reply with point group offset based on input parameters.
+        """Write a point group offset.
 
         Parameters
         ----------
@@ -352,11 +377,16 @@ class MockT2SA(tcpip.OneClientServer):
         point_group : `str`
             Which "point group" to get offset for (e.g. M1M3, M2, CAM).
         """
-
         if reference_group.lower() not in self.position_optimum:
-            await self.write_error_reply(f"No reference point group {reference_group}.")
+            await self.write_error_reply(
+                T2SAErrorCode.DidFindOrSetPointGroupAndTargetName,
+                f"No reference point group {reference_group}.",
+            )
         elif point_group.lower() not in self.position_current:
-            await self.write_error_reply(f"No point group {point_group}.")
+            await self.write_error_reply(
+                T2SAErrorCode.DidFindOrSetPointGroupAndTargetName,
+                f"No point group {point_group}.",
+            )
         else:
             await self._write_offset(
                 reference_group=reference_group.lower(), point_group=point_group.lower()
@@ -394,11 +424,15 @@ class MockT2SA(tcpip.OneClientServer):
         # about collections and pre-existing measurements.
 
         if p1group.lower() not in self.position_current:
-            await self.write_error_reply(f"No group {p1group}")
+            await self.write_error_reply(
+                T2SAErrorCode.DidFindOrSetPointGroupAndTargetName, f"No group {p1group}"
+            )
             return
 
         if p2group.lower() not in self.position_current:
-            await self.write_error_reply(f"No group {p2group}")
+            await self.write_error_reply(
+                T2SAErrorCode.DidFindOrSetPointGroupAndTargetName, f"No group {p2group}"
+            )
             return
 
         p1_index, error_message = self.parse_collection_point(
@@ -406,7 +440,9 @@ class MockT2SA(tcpip.OneClientServer):
         )
 
         if error_message:
-            await self.write_error_reply(error_message)
+            await self.write_error_reply(
+                T2SAErrorCode.FailedPointGroupMeasurement, error_message
+            )
             return
 
         p2_index, error_message = self.parse_collection_point(
@@ -414,7 +450,9 @@ class MockT2SA(tcpip.OneClientServer):
         )
 
         if error_message:
-            await self.write_error_reply(error_message)
+            await self.write_error_reply(
+                T2SAErrorCode.FailedPointGroupMeasurement, error_message
+            )
             return
 
         p1_position = self.position_current[p1group.lower()].get_one_fiducial_position(
@@ -499,7 +537,8 @@ class MockT2SA(tcpip.OneClientServer):
 
         if not self.is_ready():
             await self.write_error_reply(
-                f"T2SA not ready: {self.get_readiness_status()}."
+                T2SAErrorCode.CommandRejected,
+                f"T2SA not ready: {self.get_readiness_status()}.",
             )
             return
 
@@ -535,13 +574,14 @@ class MockT2SA(tcpip.OneClientServer):
             await self.write_good_reply(T2SA_REPLY_READY)
         except ValueError:
             await self.write_error_reply(
-                f"Failed to convert a value to float: {alt}/{az}/{rot}."
+                T2SAErrorCode.CommandRejected,
+                f"Failed to convert a value to float: {alt}/{az}/{rot}.",
             )
         except Exception as e:
-            await self.write_error_reply(f"Error: {e}")
+            await self.write_error_reply(T2SAErrorCode.CommandRejected, f"Error: {e}")
 
     async def execute_save_sa_jobfile(self, filename: str) -> None:
-        """Pretend to save SA job file.
+        """Simulate saving an SA job file.
 
         Parameters
         ----------
@@ -552,11 +592,12 @@ class MockT2SA(tcpip.OneClientServer):
         if filename.startswith("C:"):
             await self.write_good_reply(T2SA_REPLY_READY)
         else:
-            await self.write_error_reply("Save SA job file failed.")
+            await self.write_error_reply(
+                T2SAErrorCode.SaveSAJobFileFailed, "Save SA job file failed."
+            )
 
     async def execute_set_reference_group(self, reference_group: str) -> None:
-        """Set nominal point group to locate station to and provide
-        data relative to.
+        """Set the reference point group.
 
         Parameters
         ----------
@@ -566,7 +607,8 @@ class MockT2SA(tcpip.OneClientServer):
 
         if reference_group.lower() not in self.position_optimum:
             await self.write_error_reply(
-                f"No group {reference_group}. Must be one of {self.position_optimum.keys()}."
+                T2SAErrorCode.RefGroupNotFoundInTemplateFile,
+                f"No group {reference_group}. Must be one of {self.position_optimum.keys()}.",
             )
         else:
             self._reference_group = reference_group
@@ -585,19 +627,23 @@ class MockT2SA(tcpip.OneClientServer):
         """
 
         if working_frame not in self.valid_working_frame:
-            await self.write_error_reply("POS: NotFound")
+            await self.write_error_reply(
+                T2SAErrorCode.WorkingFrameNotFound, "POS: NotFound"
+            )
         else:
             self.working_frame = working_frame
             await self.write_good_reply(T2SA_REPLY_READY)
 
     async def execute_set_power(self, value: str) -> None:
-        """Set power status.
+        """Set power on or off.
 
         Parameters
         ----------
         power : `str`
-            The input argument passed to the execution. If 0 power off, it 1
-            power on and execute warmup procedure.
+            The input argument passed to the execution; one of:
+
+            * "0": power off
+            * "1": power on and execute warmup procedure.
         """
 
         if value == "0":
@@ -605,7 +651,9 @@ class MockT2SA(tcpip.OneClientServer):
         elif value == "1":
             await self.power_on()
         else:
-            await self.write_error_reply(f"Invalid input argument: {value}.")
+            await self.write_error_reply(
+                T2SAErrorCode.CommandRejected, f"Invalid input argument: {value}."
+            )
 
     async def power_off(self) -> None:
         """Set power off."""
@@ -613,13 +661,13 @@ class MockT2SA(tcpip.OneClientServer):
         await self.write_good_reply("Tracker Interface Stopped: True")
 
     async def power_on(self) -> None:
-        """Set power on."""
+        """Set power on and execute warming sequence."""
         self.laser_status = "WARM"
         self.laser_warmup_task = asyncio.create_task(self._warmup_laser())
         await self.write_good_reply("Tracker Interface Started: True")
 
     async def _write_position(self, body_name: str) -> None:
-        """Write position.
+        """Write a position.
 
         Parameters
         ----------
@@ -640,9 +688,9 @@ class MockT2SA(tcpip.OneClientServer):
         )
 
     def run_reply_loop(self, server: tcpip.OneClientServer) -> None:
-        """Method to respond to a connection request.
+        """Halt and possibly restart `reply_loop`.
 
-        This is passed in to the `tcpip.OneClientServer` as a callback method.
+        Called when a client connects or disconnects.
 
         Parameters
         ----------
@@ -659,19 +707,19 @@ class MockT2SA(tcpip.OneClientServer):
         self.log.debug("reply loop begins")
         try:
             while self.connected:
-                recv_bytes = await self.reader.readline()
-                self.log.debug(f"Mock T2SA received cmd: {recv_bytes}")
-                if not recv_bytes:
+                command_bytes = await self.reader.readline()
+                self.log.debug(f"Mock T2SA received command: {command_bytes}")
+                if not command_bytes:
                     self.log.info(
                         "read loop ending; null data read indicates client hung up"
                     )
                     break
 
-                recv_message = recv_bytes.decode().strip()
-                if not recv_message:
+                command = command_bytes.decode().strip()
+                if not command:
                     continue
 
-                await self._handle_message(recv_message)
+                await self._handle_comand(command)
         except asyncio.CancelledError:
             pass
         except (asyncio.IncompleteReadError, ConnectionResetError):
@@ -689,24 +737,27 @@ class MockT2SA(tcpip.OneClientServer):
         self.log.debug("stop pretending to measure")
 
     async def write_good_reply(self, reply: str) -> None:
-        """Write a good reply to the client, prefixed with 'ACK-300 '
+        r"""Write a good reply to the client, prefixed with "ACK-300 "
 
         Parameters
         ----------
         reply : `str`
-            The reply (without a leading ACK-300 or trailing "\r\n")
+            The reply (without a leading "ACK-xxx " or trailing "\\r\\n".
         """
         await self._write_reply(f"ACK-300 {reply}")
 
-    async def write_error_reply(self, reply: str) -> None:
-        """Write an error reply to the client, prefixed with 'ERR-300 '
+    async def write_error_reply(self, code: T2SAErrorCode, reply: str) -> None:
+        r"""Write an error reply to the client, prefixed with "ERR-xxx ".
 
         Parameters
         ----------
+        code : `T2SAErrorCode`
+            The error code.
         reply : `str`
-            The reply (without a leading ERR-300 or trailing "\r\n")
+            The reply (without a leading "ERR-xxx " or trailing "\\r\\n".
         """
-        await self._write_reply(f"ERR-300 {reply}")
+        code = T2SAErrorCode(code)
+        await self._write_reply(f"ERR-{code} {reply}")
 
     async def _write_offset(self, reference_group: str, point_group: str) -> None:
         """Write offset.
@@ -808,7 +859,7 @@ class MockT2SA(tcpip.OneClientServer):
         )
 
     async def _write_reply(self, reply: str) -> None:
-        """Write reply.
+        """Write a reply.
 
         Parameters
         ----------
@@ -831,36 +882,34 @@ class MockT2SA(tcpip.OneClientServer):
             self.laser_status = "LON"
         return True
 
-    async def _handle_message(self, message: str) -> None:
-        """Handle message from client.
+    async def _handle_comand(self, command: str) -> None:
+        """Handle a command from the client.
 
         Parameters
         ----------
-        message : `str`
-            Message from client to process.
+        command : `str`
+            Command.
         """
-
-        command_handler, command_kwargs = self._parse_message(message)
+        command_handler, command_kwargs = self._parse_command(command)
 
         await command_handler(**command_kwargs)
 
-    def _parse_message(self, message: str) -> tuple[typing.Any, dict[str, str]]:
-        """Parse message from client.
+    def _parse_command(self, command: str) -> tuple[typing.Any, dict[str, str]]:
+        """Parse a command from the client.
 
         Parameters
         ----------
-        message : `str`
-            Received message from client.
+        command : `str`
+            Command.
 
         Returns
         -------
         command_handler : `object`
-            An awaitable method that handles the response to the parsed
-            message.
+            An awaitable method that handles the command.
         command_kwargs : `dict`[`str`, `str`]
-            Dictionary with keywords arguments to pass to the command handler.
+            Dictionary with keywords arguments to pass to ``command_handler``.
         """
-        command_name, _, args_str = message.partition(":")
+        command_name, _, args_str = command.partition(":")
         command_handler, args_regex = self.dispatchers.get(command_name, (None, None))
 
         if args_regex is not None:
@@ -871,12 +920,12 @@ class MockT2SA(tcpip.OneClientServer):
                 else dict()
             )
         else:
-            canned_reply = self.canned_replies.get(message)
+            canned_reply = self.canned_replies.get(command)
             if canned_reply is not None:
                 command_handler = self.write_good_reply
                 command_kwargs = dict(reply=canned_reply)
             else:
-                err_msg = f"Unsupported command {message!r}"
+                err_msg = f"Unsupported command {command!r}"
                 self.log.error(err_msg)
                 command_handler = self.write_error_reply
                 command_kwargs = dict(reply=err_msg)

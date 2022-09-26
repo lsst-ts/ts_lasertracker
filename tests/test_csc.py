@@ -201,7 +201,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
             # should fail because the laser is initially off.
             with self.assertRaisesRegex(
-                salobj.AckError, " T2SA not ready: Laser status LOFF. Should be 'LON'"
+                salobj.AckError, "T2SA not ready: Laser status LOFF. Should be 'LON'"
             ):
                 await self.remote.cmd_healthCheck.start(timeout=STD_TIMEOUT)
 
@@ -269,7 +269,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         ):
 
             with self.assertRaisesRegex(
-                salobj.AckError, " T2SA not ready: Laser status LOFF. Should be 'LON'"
+                salobj.AckError, "T2SA not ready: Laser status LOFF. Should be 'LON'"
             ):
                 await self.remote.cmd_measurePoint.set_start(
                     collection="A",
@@ -459,7 +459,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         ):
 
             with self.assertRaisesRegex(
-                salobj.AckError, " T2SA not ready: Laser status LOFF. Should be 'LON'"
+                salobj.AckError, "T2SA not ready: Laser status LOFF. Should be 'LON'"
             ):
 
                 await self.remote.cmd_measureDrift.set_start(

@@ -19,31 +19,22 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-__all__ = ["AlignmentDetailedState", "AlignmentCSC", "run_mtalignment"]
+__all__ = ["AlignmentCSC", "run_mtalignment"]
 
 import asyncio
-import enum
+import pathlib
+import typing
 
-from lsst.ts import salobj
+from lsst.ts import salobj, utils
 
 from . import __version__
 from .alignment_model import AlignmentModel
 from .config_schema import CONFIG_SCHEMA
-
+from .mock import MockT2SA
+from .utils import Target
 
 # The following targets must appear in config.targets
 REQUIRED_TARGETS = {"CAM", "M1M3", "M2"}
-
-
-class AlignmentDetailedState(enum.IntEnum):
-    DISABLED = 1
-    ENABLED = 2
-    FAULT = 3
-    OFFLINE = 4
-    STANDBY = 5
-    MEASURING = 6
-    TWOFACE_CHECK = 7
-    DRIFT_CHECK = 8
 
 
 class AlignmentCSC(salobj.ConfigurableCsc):
@@ -70,9 +61,9 @@ class AlignmentCSC(salobj.ConfigurableCsc):
         * 2: minimal internal simulator with canned responses
     """
 
-    version = __version__
-    valid_simulation_modes = (0, 1, 2)
-    simulation_help = """
+    version: str = __version__
+    valid_simulation_modes: tuple[int, int, int] = (0, 1, 2)
+    simulation_help: str = """
     Simulation mode 1 does not fully simulate the CSC, but rather
     taps into the simulation features of SpatialAnalyzer. This should allow
     us to exercise the vendor code in tests and also a very robust simulation
@@ -88,11 +79,11 @@ class AlignmentCSC(salobj.ConfigurableCsc):
 
     def __init__(
         self,
-        config_dir=None,
-        initial_state=salobj.State.STANDBY,
-        override="",
-        simulation_mode=0,
-    ):
+        config_dir: str | pathlib.Path | None = None,
+        initial_state: salobj.State = salobj.State.STANDBY,
+        override: str = "",
+        simulation_mode: int = 0,
+    ) -> None:
         super().__init__(
             name="MTAlignment",
             index=0,
@@ -102,36 +93,89 @@ class AlignmentCSC(salobj.ConfigurableCsc):
             override=override,
             simulation_mode=simulation_mode,
         )
-        self.model = None
-        self.max_iters = 3
+        self.model: None | AlignmentModel = None
 
-        # temporary variables for position; these will eventually be supplied
-        # by the TMA and camera rotator CSCs.
-        self.elevation = 90
+        # These values are only used to tag the data on the T2SA and do not
+        # need to have any connection with the actual telescope position.
+        # Will set some default values were we plan to execute the measurements
+        # we could make these configurable parameters, or even add a command
+        # to allow dynamic changing them, but I am not confident this is
+        # necessary.
+        self.elevation = 60
         self.azimuth = 0
         self.camrot = 0
-        self.last_measurement = None
 
-    async def handle_summary_state(self):
+        self.last_measurement: dict[str, float | str] | None = None
+
+        self._run_telemetry_loop = False
+        self.telemetry_loop_task: asyncio.Task = utils.make_done_future()
+
+        self.laser_status_ready = asyncio.Event()
+
+        self._mock_t2sa: None | MockT2SA = None
+
+    async def handle_summary_state(self) -> None:
+        """Override parent class method to handle summary state changes."""
         if self.disabled_or_enabled:
+            t2sa_host = self.config.t2sa_host
+            t2sa_port = self.config.t2sa_port
+
+            if self.simulation_mode == 2 and self._mock_t2sa is None:
+
+                self.log.debug("Running t2sa mock.")
+                self._mock_t2sa = MockT2SA(log=self.log)
+                await self._mock_t2sa.start_task
+                t2sa_host = self._mock_t2sa.host
+                t2sa_port = self._mock_t2sa.port
+
             if self.model is None:
+                self.log.info(
+                    f"Connecting alignment model to: {t2sa_host}:{t2sa_port} [mode: {self.simulation_mode}]."
+                )
                 self.model = AlignmentModel(
-                    host=self.config.t2sa_host,
-                    port=self.config.t2sa_port,
+                    host=t2sa_host,
+                    port=t2sa_port,
                     read_timeout=self.config.read_timeout,
-                    simulation_mode=self.simulation_mode,
+                    t2sa_simulation_mode=self.simulation_mode == 1,
                     log=self.log,
                 )
                 await self.model.connect()
                 self.log.debug(
                     f"connected to t2sa at {self.model.host}:{self.model.port}"
                 )
+
+            if self.telemetry_loop_task.done():
+                self._run_telemetry_loop = True
+                self.telemetry_loop_task = asyncio.create_task(
+                    self.run_telemetry_loop()
+                )
         else:
+            await self.stop_telemetry_loop()
+
             if self.model is not None:
-                await self.model.disconnect()
+                try:
+                    await self.model.disconnect()
+                except Exception:
+                    self.log.exception("Error disconnecting model. Continuing.")
                 self.model = None
 
-    async def configure(self, config):
+            if self._mock_t2sa is not None:
+                try:
+                    await self._mock_t2sa.close_client()
+                    await self._mock_t2sa.close()
+                except Exception:
+                    self.log.exception("Error closing mock t2sa. Continuing.")
+                self._mock_t2sa = None
+
+    async def configure(self, config: typing.Any) -> None:
+        """Override parent class method to configure CSC.
+
+        Parameters
+        ----------
+        config : `object`
+            The configuration, as described by the config schema, as a
+            struct-like object.
+        """
         missing_targets = REQUIRED_TARGETS - set(config.targets)
         if missing_targets:
             raise RuntimeError(
@@ -141,183 +185,364 @@ class AlignmentCSC(salobj.ConfigurableCsc):
         if self.model is not None:
             if self.model.connected:
                 await self.model.disconnect()
-            await self.model.connect(self.config.t2sa_host, self.config.t2sa_port)
+            await self.model.connect()
 
     @staticmethod
-    def get_config_pkg():
+    def get_config_pkg() -> str:
         return "ts_config_mttcs"
 
-    async def do_measureTarget(self, data):
+    async def do_measureTarget(self, data: salobj.BaseDdsDataType) -> None:
+        """Measure and return coordinates of a target.
+
+        Parameters
+        ----------
+        data : ``cmd_measureTarget.DataType``
+            Command data.
+        """
         self.log.debug("measure Target")
-        """Measure and return coordinates of a target. Options are
-        M1M3, M2, CAM, and DOME"""
         self.assert_enabled()
+        assert self.model is not None
         if data.target not in self.config.targets:
             raise salobj.ExpectedError(
                 f"Unknown target {data.target}; must one of {self.config.targets}"
             )
+
+        self.laser_status_ready.clear()
         await self.model.measure_target(data.target)
-        result = await self.model.get_target_position(data.target)
-        self.log.debug(
-            self.parse_offsets(result)
-        )  # TODO publish an event with the measured coords
-        self.last_measurement = self.parse_offsets(result)
+        await self.laser_status_ready.wait()
 
-    async def do_align(self, data):
-        """Perform correction loop"""
+        self.last_measurement = await self.model.get_target_position(data.target)
+
+        await self.evt_positionPublish.set_write(**self.last_measurement)
+
+    async def do_align(self, data: salobj.BaseDdsDataType) -> None:
+        """Measure alignment.
+
+        Parameters
+        ----------
+        data : ``cmd_align.DataType``
+            Command data.
+        """
         self.assert_enabled()
 
-    async def do_healthCheck(self, data):
-        """run healthcheck script"""
-        self.assert_enabled()
-        await self.model.twoface_check()
-        await self.model.measure_drift()
+        target = Target(data.target)
 
-    async def do_laserPower(self, data):
-        """put the laser in sleep state"""
+        await self.measure_alignment(target=target.name)
+
+    async def do_healthCheck(self, data: salobj.BaseDdsDataType) -> None:
+        """Execute health check.
+
+        Parameters
+        ----------
+        data : ``cmd_healthcheck.DataType``
+            Command data.
+        """
         self.assert_enabled()
+        assert self.model is not None
+
+        self.log.info("Running health check.")
+        for target in self.config.targets:
+            self.log.debug(f"Running two face check for {target}.")
+            await self.model.twoface_check(target)
+            self.log.debug(f"Measuring drift for {target}.")
+            await self.model.measure_drift(target)
+
+    async def do_laserPower(self, data: salobj.BaseDdsDataType) -> None:
+        """Power laser on/off.
+
+        Parameters
+        ----------
+        data : ``cmd_laserPower``
+            Command data.
+        """
+        self.assert_enabled()
+        assert self.model is not None
         if data.power == 0:
             await self.model.laser_off()
         else:
             await self.model.laser_on()
 
-    async def do_powerOff(self, data):
-        """full power off of tracker and interface"""
-        self.assert_enabled()
-        await self.model.tracker_off()
+    async def do_powerOff(self, data: salobj.BaseDdsDataType) -> None:
+        """Fully power off tracker and interface.
 
-    async def do_measurePoint(self, data):
-        """measure and return coords of a specific point"""
-        self.assert_enabled()
-        await self.model.measure_single_point(
-            data.collection, data.pointgroup, data.target
-        )
-
-    async def do_pointDelta(self, data):
-        """publish an event containing a vector between two points"""
-        self.assert_enabled()
-        data = await self.model.get_point_delta(
-            data.collection_A,
-            data.pointgroup_A,
-            data.target_A,
-            data.collection_B,
-            data.pointgroup_B,
-            data.target_B,
-        )
-
-    async def do_setReferenceGroup(self, data):
-        """Nominal point group to locate tracker station to and provide data
-        relative to"""
-        self.assert_enabled()
-        await self.model.set_reference_group(data.pointgroup)
-
-    async def do_setWorkingFrame(self, data):
-        """attempt to set the passed string as the SpatialAnalyzer working
-        frame"""
-        self.assert_enabled()
-        await self.model.set_working_frame(data.workingframe)
-
-    async def do_halt(self, data):
-        """halts any executing measurement plan and returns to ready state"""
-        self.assert_enabled()
-        await self.model.halt()
-
-    async def do_loadSATemplateFile(self, data):
-        """SA Template file path and name. This is in the filesystem on the
-        T2SA host."""
-        self.assert_enabled()
-        await self.model.load_template_file(data.filepath)
-
-    async def do_measureDrift(self, data):
-        """measure tracker drift"""
-        self.assert_enabled()
-        await self.model.measure_drift()
-
-    async def do_resetT2SA(self, data):
-        """reboots t2sa and SA"""
-        self.assert_enabled()
-        await self.model.reset_t2sa()
-
-    async def do_newStation(self, data):
-        """create new tracker station"""
-        self.assert_enabled()
-        await self.model.new_station()
-
-    async def do_saveJobfile(self, data):
-        """save job file"""
-        self.assert_enabled()
-
-    async def correction_loop(self):
-        await self.model.set_telescope_position(
-            self.elevation, self.azimuth, self.camrot
-        )
-
-        await self.model.measure_target("M1M3")
-        aligned = False
-        loopcount = 1
-        while not aligned:
-            self.log.info(f"Loop iteration: {loopcount}")
-            await self.model.measure_target("CAM")
-            await self.model.measure_target("M2")
-
-            cam_offset = self.parse_offsets(await self.model.get_offset("CAM"))
-            m2_offset = self.parse_offsets(await self.model.get_offset("M2"))
-
-            if self.in_tolerance(cam_offset) and self.in_tolerance(m2_offset):
-                break
-            elif loopcount >= self.max_iters:
-                break
-            else:
-                loopcount += 1
-
-    def parse_offsets(self, t2sa_string):
-        """
-        Takes a string containing spatial coordinates  from T2SA, and returns
-        a dict with the following keys: RefFrame, X, Y, Z, Rx, Ry, Rz, and
-        Timestamp
+        This requires a manual startup after being executed.
 
         Parameters
         ----------
+        data : ``cmd_powerOff.DataType``
+            Command data.
 
-        t2sa_string : `str`
-            the ascii string from T2SA. We expect an ascii string delimited
-            with colons and semicolons, formatted like this:
-
-            <s>;X:<n>;Y:<n>;Z:<n>;Rx:<n>;Ry:<n>;Rz:<n>;<date>
-
-            where <s> is the name of the reference frame and <n> is a
-            floating point value.
+        .. deprecated:: 0.3.0
+            `do_powerOff` is not supported and will be removed in xml 12.1.
         """
-        bits = [b.split(":") for b in t2sa_string.split(";")]
-        coordsDict = {}
-        try:
-            # ref frame
-            coordsDict[bits[0][0]] = bits[0][1]
+        self.assert_enabled()
 
-            # coords
-            for s in bits[1:7]:
-                coordsDict[s[0]] = float(s[1])
+        # TODO (DM-36112): Remove powerOff command.
+        raise salobj.ExpectedError(
+            "Powering off the T2SA controller is unsupported from the CSC."
+        )
 
-            # timestamp
-            coordsDict["Timestamp"] = f"{bits[7][0]}:{bits[7][1]}:{bits[7][2]}"
-        except ValueError or IndexError:
-            raise Exception(
-                f"Failed to parse coordinates string '{t2sa_string}' received from T2SA."
+    async def do_measurePoint(self, data: salobj.BaseDdsDataType) -> None:
+        """Measure and return coords of a specific point.
+
+        Parameters
+        ----------
+        data : ``cmd_measuerPoint.DataType``
+            Command data.
+        """
+        self.assert_enabled()
+        assert self.model is not None
+
+        measurement = await self.model.measure_single_point(
+            data.collection, data.pointgroup, data.target
+        )
+
+        await self.evt_positionPublish.set_write(
+            target=f"{data.target}",
+            dX=measurement.x,
+            dY=measurement.y,
+            dZ=measurement.z,
+            dRX=0.0,
+            dRY=0.0,
+            dRZ=0.0,
+        )
+
+    async def do_pointDelta(self, data: salobj.BaseDdsDataType) -> None:
+        """Publish an event containing a vector between two points.
+
+        Parameters
+        ----------
+        data : ``cmd_pointDelta.DataType``
+            Command data.
+        """
+        self.assert_enabled()
+        assert self.model is not None
+        point_delta = await self.model.get_point_delta(
+            p1collection=data.collection_A,
+            p1group=data.pointgroup_A,
+            p1=data.target_A,
+            p2group=data.pointgroup_B,
+            p2=data.target_B,
+            p2collection=data.collection_B,
+        )
+
+        # TODO (DM-36112): Publish event and remove log message.
+        self.log.info(f"Point delta: {point_delta}.")
+
+    async def do_setReferenceGroup(self, data: salobj.BaseDdsDataType) -> None:
+        """Set the reference group with respect to which all measurements will
+        be made against.
+
+        Parameters
+        ----------
+        data : ``cmd_setReferenceGroup.DataType``
+            Command data.
+        """
+        self.assert_enabled()
+        assert self.model is not None
+        await self.model.set_reference_group(data.referenceGroup)
+
+        # TODO (DM-36112): Publish reference group
+        self.log.info(f"New reference group: {data.referenceGroup}")
+
+    async def do_setWorkingFrame(self, data: salobj.BaseDdsDataType) -> None:
+        """Set the SpatialAnalyzer working frame.
+
+        Parameters
+        ----------
+        data : ``cmd_setWorkingFrame.DataType``
+            Command data.
+        """
+        self.assert_enabled()
+        assert self.model is not None
+        await self.model.set_working_frame(data.workingFrame)
+
+        # TODO (DM-36112): Publish an event with the working frame.
+
+    async def do_halt(self, data: salobj.BaseDdsDataType) -> None:
+        """Halts any executing measurement plan and returns to ready state.
+
+        Parameters
+        ----------
+        data : ``cmd_halt.DataType``
+            Command data.
+        """
+        self.assert_enabled()
+        assert self.model is not None
+        await self.model.halt()
+
+    async def do_loadSATemplateFile(self, data: salobj.BaseDdsDataType) -> None:
+        """Load SA Template file.
+
+        Parameters
+        ----------
+        data : ``cmd_loadSATemplateFile.DataType``
+            Command data.
+        """
+        self.assert_enabled()
+        assert self.model is not None
+        await self.model.load_template_file(data.file)
+
+        # TODO (DM-36112): Publish something?
+
+    async def do_measureDrift(self, data: salobj.BaseDdsDataType) -> None:
+        """Measure tracker drift.
+
+        Parameters
+        ----------
+        data : ``cmd_measureDrift.DataType``
+            Command data.
+        """
+        self.assert_enabled()
+        assert self.model is not None
+        await self.model.measure_drift(data.pointgroup)
+
+        # TODO (DM-36112): Publish something?
+
+    async def do_resetT2SA(self, data: salobj.BaseDdsDataType) -> None:
+        """Reboots t2sa and SA.
+
+        Parameters
+        ----------
+        data : ``cmd_resetT2SA.DataType``
+            Command data.
+        """
+        self.assert_enabled()
+        assert self.model is not None
+
+        await self.model.reset_t2sa()
+
+        # TODO (DM-36112): Publish something?
+
+    async def do_newStation(self, data: salobj.BaseDdsDataType) -> None:
+        """Add new tracker station.
+
+        Parameters
+        ----------
+        data : ``cmd_newStation.DataType``
+            Command data.
+        """
+        self.assert_enabled()
+        assert self.model is not None
+
+        await self.model.new_station()
+
+        # TODO (DM-36112): Publish something?
+
+    async def do_saveJobfile(self, data: salobj.BaseDdsDataType) -> None:
+        """Save job file.
+
+        Parameters
+        ----------
+        data : ``cmd_saveJobFile.DataType``
+            Command data.
+        """
+        self.assert_enabled()
+        assert self.model is not None
+
+        await self.model.save_sa_jobfile(data.file)
+
+        # TODO (DM-36112): Publish something?
+
+    async def measure_alignment(self, target: str) -> None:
+        """Measure the offset between M1M3 optimum position and the target.
+
+        Parameters
+        ----------
+        target : `str`
+            Target to measure offset with respect to M1M3 optimum position.
+        """
+
+        assert self.model is not None
+
+        await self.model.set_telescope_position(
+            telalt=self.elevation,
+            telaz=self.azimuth,
+            camrot=self.camrot,
+        )
+
+        await self.model.measure_target("M1M3")
+
+        if target != "M1M3":
+            await self.model.measure_target(target)
+
+        target_offset = await self.model.get_target_offset(
+            target=target, reference_pointgroup="M1M3"
+        )
+
+        await self.evt_offsetsPublish.set_write(**target_offset)
+
+    async def run_telemetry_loop(self) -> None:
+        """Run telemetry loop.
+
+        The telemetry loop will run while the CSC is in disable or enabled
+        state.
+        """
+
+        assert self.model is not None
+
+        while self._run_telemetry_loop:
+
+            status = await self.model.check_status()
+            if status == "READY":
+                self.laser_status_ready.set()
+            else:
+                self.laser_status_ready.clear()
+
+            # TODO (DM-36112): Publish events with telemetry data.
+
+            await asyncio.sleep(self.heartbeat_interval)
+
+    async def stop_telemetry_loop(self) -> None:
+        """Stop the telemetry loop and clean up.
+
+        If the telemetry loop task is still running when this method is called,
+        it waits 2 heartbeat interval for it to finish and then proceed to
+        cancel it. If any unexpected exception occurs, log them and continue.
+
+        The idea is to allow the telemetry loop some time to finish before
+        canceling it, which sometimes help prevent issues with sockets hanging
+        out.
+        """
+
+        if not self.telemetry_loop_task.done():
+            self._run_telemetry_loop = False
+            wait_finish_interval = self.heartbeat_interval * 2
+            self.log.debug(
+                f"Telemetry loop task still running. Waiting {wait_finish_interval}s for it to finish."
             )
-        return coordsDict
+            try:
+                await asyncio.wait_for(
+                    self.telemetry_loop_task, timeout=wait_finish_interval
+                )
+            except asyncio.TimeoutError:
+                # TimeoutError might happen if the tasks takes too long to
+                # finish. Will cancel it and move forward.
+                self.log.debug("Telemetry loop did not finished, cancelling it.")
+                self.telemetry_loop_task.cancel()
+                try:
+                    await self.telemetry_loop_task
+                except asyncio.CancelledError:
+                    # CancelledError is expected since we canceled it.
+                    pass
+                except Exception:
+                    # Any other exception is unexpected. Will log and continue.
+                    self.log.exception("Error cancelling telemetry loop. Ignoring...")
+            except Exception:
+                # Any other exception is unexpected. Will log and continue.
+                self.log.exception("Error finalizing telemetry. Ignoring...")
 
-    def in_tolerance(self, coords):
+    def in_tolerance(self, coords: dict[str, str | float]) -> bool:
         """Returns true if the specified coords are in tolerance.
 
         Parameters
         ----------
-
         coords : `Dict`
             Dict containing coordinates
         """
         raise NotImplementedError()
 
 
-def run_mtalignment():
+def run_mtalignment() -> None:
     """Run the MTAlignment CSC."""
     asyncio.run(AlignmentCSC.amain(index=None))

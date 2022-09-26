@@ -19,46 +19,63 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+import asyncio
 import logging
 import pathlib
+import typing
 import unittest
 
+import numpy as np
+import pytest
 from lsst.ts import MTAlignment, salobj
 
 STD_TIMEOUT = 15  # standard command timeout (sec)
 TEST_CONFIG_DIR = pathlib.Path(__file__).parent.joinpath("data", "config")
 
 
-# Avoid adding more than one log handler;
-# the handler (and level, if configured) persist between tests.
-# Note: making this bool a class variable does not work; unittest restores
-# the value for each test. A mutable object works, but is too much trouble.
-add_stream_log_handler = True
-
-
 class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
-    def basic_make_csc(self, config_dir, initial_state, override="", simulation_mode=2):
-        global add_stream_log_handler
+    def basic_make_csc(
+        self,
+        config_dir: typing.Union[str, pathlib.Path, None],
+        initial_state: typing.Union[salobj.State, int],
+        override: str = "",
+        simulation_mode: int = 2,
+    ) -> MTAlignment.AlignmentCSC:
         csc = MTAlignment.AlignmentCSC(
             config_dir=config_dir,
             initial_state=initial_state,
             override=override,
             simulation_mode=simulation_mode,
         )
-        if add_stream_log_handler:
-            add_stream_log_handler = False
-            csc.log.addHandler(logging.StreamHandler())
-            csc.log.setLevel(logging.INFO)
         return csc
 
-    async def test_bin_script(self):
+    async def quick_power_on(self, laser_warmup_time: float, wait_warmup: bool) -> None:
+        """Quickly power on laser.
+
+        Parameters
+        ----------
+        laser_warmup_time : `float`
+            How long should warmup time take (in seconds)?
+        wait_warmup : `bool`
+            Wait for warmup to finish?
+        """
+        # set warmup time to 0.
+        assert self.csc._mock_t2sa is not None
+        self.csc._mock_t2sa.laser_warmup_time = laser_warmup_time
+
+        await self.remote.cmd_laserPower.set_start(power=1, timeout=STD_TIMEOUT)
+
+        if wait_warmup:
+            await self.csc._mock_t2sa.laser_warmup_task
+
+    async def test_bin_script(self) -> None:
         await self.check_bin_script(
             name="MTAlignment",
             index=0,
             exe_name="run_mtalignment",
         )
 
-    async def test_standard_state_transitions(self):
+    async def test_standard_state_transitions(self) -> None:
         async with self.make_csc(
             config_dir=TEST_CONFIG_DIR,
             initial_state=salobj.State.STANDBY,
@@ -86,13 +103,475 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 ],
             )
 
-    async def test_basics(self):
+    async def test_measure_target_laser_off(self) -> None:
+
         async with self.make_csc(
             initial_state=salobj.State.ENABLED,
             override="",
             config_dir=TEST_CONFIG_DIR,
             simulation_mode=2,
         ):
+
+            with self.assertRaisesRegex(
+                salobj.AckError, "T2SA not ready: Laser status LOFF. Should be 'LON'"
+            ):
+
+                await self.remote.cmd_measureTarget.set_start(
+                    target="M1M3", timeout=STD_TIMEOUT
+                )
+
+    async def test_measure_target_while_warming(self) -> None:
+
+        async with self.make_csc(
+            initial_state=salobj.State.ENABLED,
+            override="",
+            config_dir=TEST_CONFIG_DIR,
+            simulation_mode=2,
+        ):
+
+            await self.quick_power_on(laser_warmup_time=10.0, wait_warmup=False)
+
+            with self.assertRaisesRegex(
+                salobj.AckError, "T2SA not ready: Laser status WARM. Should be 'LON'"
+            ):
+                await self.remote.cmd_measureTarget.set_start(
+                    target="M1M3", timeout=STD_TIMEOUT
+                )
+
+            # Wait warmup to complete then try to measure again. This should
+            # actually be an event from the CSC but we don't have it at this
+            # point.
+            await self.csc._mock_t2sa.laser_warmup_task
+
+            self.remote.evt_positionPublish.flush()
+
             await self.remote.cmd_measureTarget.set_start(
                 target="M1M3", timeout=STD_TIMEOUT
             )
+
+            await self.assert_next_sample(
+                self.remote.evt_positionPublish,
+                flush=False,
+                target="FRAMEM1M3",
+                dX=pytest.approx(0.0, abs=1e-2),
+                dY=pytest.approx(0.0, abs=1e-2),
+                dZ=pytest.approx(0.0, abs=1e-2),
+                dRX=pytest.approx(0.0, abs=6e-2),
+                dRY=pytest.approx(0.0, abs=6e-2),
+                dRZ=pytest.approx(0.0, abs=6e-2),
+            )
+
+    async def test_measure_target(self) -> None:
+
+        async with self.make_csc(
+            initial_state=salobj.State.ENABLED,
+            override="",
+            config_dir=TEST_CONFIG_DIR,
+            simulation_mode=2,
+        ):
+
+            await self.quick_power_on(laser_warmup_time=0.0, wait_warmup=True)
+
+            self.remote.evt_positionPublish.flush()
+
+            await self.remote.cmd_measureTarget.set_start(
+                target="M1M3", timeout=STD_TIMEOUT
+            )
+
+            await self.assert_next_sample(
+                self.remote.evt_positionPublish,
+                flush=False,
+                target="FRAMEM1M3",
+                dX=pytest.approx(0.0, abs=1e-2),
+                dY=pytest.approx(0.0, abs=1e-2),
+                dZ=pytest.approx(0.0, abs=1e-2),
+                dRX=pytest.approx(0.0, abs=6e-2),
+                dRY=pytest.approx(0.0, abs=6e-2),
+                dRZ=pytest.approx(0.0, abs=6e-2),
+            )
+
+    async def test_health_check_fail_laser_off(self) -> None:
+
+        async with self.make_csc(
+            initial_state=salobj.State.ENABLED,
+            override="",
+            config_dir=TEST_CONFIG_DIR,
+            simulation_mode=2,
+        ):
+
+            # should fail because the laser is initially off.
+            with self.assertRaisesRegex(
+                salobj.AckError, " T2SA not ready: Laser status LOFF. Should be 'LON'"
+            ):
+                await self.remote.cmd_healthCheck.start(timeout=STD_TIMEOUT)
+
+    async def test_health_check_laser_on(self) -> None:
+
+        async with self.make_csc(
+            initial_state=salobj.State.ENABLED,
+            override="",
+            config_dir=TEST_CONFIG_DIR,
+            simulation_mode=2,
+        ):
+
+            await self.quick_power_on(laser_warmup_time=0.0, wait_warmup=True)
+            with self.assertLogs(self.csc.log, level=logging.DEBUG) as csc_logs:
+                await self.remote.cmd_healthCheck.start(timeout=STD_TIMEOUT)
+
+            expected_logs = [
+                log
+                for sublist in [
+                    (
+                        f"DEBUG:MTAlignment:Running two face check for {target}.",
+                        f"DEBUG:MTAlignment:Measuring drift for {target}.",
+                    )
+                    for target in ["CAM", "M1M3", "M2"]
+                ]
+                for log in sublist
+            ]
+
+            for log in expected_logs:
+                assert log in csc_logs.output
+
+    async def test_laser_power(self) -> None:
+        async with self.make_csc(
+            initial_state=salobj.State.ENABLED,
+            override="",
+            config_dir=TEST_CONFIG_DIR,
+            simulation_mode=2,
+        ):
+
+            # power on.
+            await self.quick_power_on(laser_warmup_time=1.0, wait_warmup=False)
+
+            # There's no event reporting the laser status. For now just check
+            # that the mock controller was powered on.
+            assert self.csc._mock_t2sa.laser_status == "WARM"
+
+            # Again, since there is no event, wait for the warmup task to
+            # complete.
+            await self.csc._mock_t2sa.laser_warmup_task
+
+            assert self.csc._mock_t2sa.laser_status == "LON"
+
+            # power off
+            await self.remote.cmd_laserPower.set_start(power=0, timeout=STD_TIMEOUT)
+
+            assert self.csc._mock_t2sa.laser_status == "LOFF"
+            assert self.csc._mock_t2sa.laser_warmup_task.done()
+
+    async def test_measure_point_laser_off(self) -> None:
+        async with self.make_csc(
+            initial_state=salobj.State.ENABLED,
+            override="",
+            config_dir=TEST_CONFIG_DIR,
+            simulation_mode=2,
+        ):
+
+            with self.assertRaisesRegex(
+                salobj.AckError, " T2SA not ready: Laser status LOFF. Should be 'LON'"
+            ):
+                await self.remote.cmd_measurePoint.set_start(
+                    collection="A",
+                    pointgroup="M1M3",
+                    target="M1M3_1",
+                    timeout=STD_TIMEOUT,
+                )
+
+    async def test_measure_point(self) -> None:
+        async with self.make_csc(
+            initial_state=salobj.State.ENABLED,
+            override="",
+            config_dir=TEST_CONFIG_DIR,
+            simulation_mode=2,
+        ):
+
+            await self.quick_power_on(laser_warmup_time=0.0, wait_warmup=True)
+
+            self.remote.evt_positionPublish.flush()
+
+            await self.remote.cmd_measurePoint.set_start(
+                collection="A",
+                pointgroup="M1M3",
+                target="M1M3_1",
+                timeout=STD_TIMEOUT,
+            )
+
+            position = await self.assert_next_sample(
+                self.remote.evt_positionPublish,
+                flush=False,
+                target="M1M3_1",
+            )
+
+            assert np.sqrt(
+                position.dX**2.0 + position.dY**2.0 + position.dZ**2.0
+            ) * 1e-3 == pytest.approx(8.4, rel=1e-3)
+
+    async def test_point_delta(self) -> None:
+        async with self.make_csc(
+            initial_state=salobj.State.ENABLED,
+            override="",
+            config_dir=TEST_CONFIG_DIR,
+            simulation_mode=2,
+        ):
+
+            await self.quick_power_on(laser_warmup_time=0.0, wait_warmup=True)
+
+            await self.remote.cmd_pointDelta.set_start(
+                collection_A="A",
+                pointgroup_A="M2",
+                target_A="M2_P2",
+                collection_B="MEAS_M2_1",
+                pointgroup_B="M2",
+                target_B="M2_P2",
+                timeout=STD_TIMEOUT,
+            )
+
+    async def test_set_reference_group(self) -> None:
+
+        async with self.make_csc(
+            initial_state=salobj.State.ENABLED,
+            override="",
+            config_dir=TEST_CONFIG_DIR,
+            simulation_mode=2,
+        ):
+
+            await self.remote.cmd_setReferenceGroup.set_start(
+                referenceGroup="M2",
+                timeout=STD_TIMEOUT,
+            )
+
+            # Since there's no event yet with this information, check that it
+            # gets updated in the mock controller.
+            assert self.csc._mock_t2sa.reference_frame == "FRAMEM2"
+
+    async def test_set_working_frame(self) -> None:
+
+        async with self.make_csc(
+            initial_state=salobj.State.ENABLED,
+            override="",
+            config_dir=TEST_CONFIG_DIR,
+            simulation_mode=2,
+        ):
+
+            await self.remote.cmd_setWorkingFrame.set_start(
+                workingFrame="",
+                timeout=STD_TIMEOUT,
+            )
+
+            # TODO: Add some check.
+
+    async def test_set_working_frame_invalid(self) -> None:
+
+        async with self.make_csc(
+            initial_state=salobj.State.ENABLED,
+            override="",
+            config_dir=TEST_CONFIG_DIR,
+            simulation_mode=2,
+        ):
+
+            with self.assertRaises(salobj.AckError):
+                await self.remote.cmd_setWorkingFrame.set_start(
+                    workingFrame="INVALID",
+                    timeout=STD_TIMEOUT,
+                )
+
+            # TODO: Add some check.
+
+    async def test_halt(self) -> None:
+
+        async with self.make_csc(
+            initial_state=salobj.State.ENABLED,
+            override="",
+            config_dir=TEST_CONFIG_DIR,
+            simulation_mode=2,
+        ):
+
+            await self.quick_power_on(laser_warmup_time=0.0, wait_warmup=True)
+
+            measure_task = asyncio.create_task(
+                self.remote.cmd_measureTarget.set_start(
+                    target="M1M3", timeout=STD_TIMEOUT
+                )
+            )
+
+            # Give it some time for the measure to start.
+            await asyncio.sleep(0.5)
+
+            # Halt measurement
+            await self.remote.cmd_halt.set_start(
+                timeout=STD_TIMEOUT,
+            )
+
+            # I am not really sure what should happen in this case. I need
+            # to get more informatino from the controller to write this checks
+            # I am going to assume the measument command should fail.
+            with self.assertRaisesRegex(salobj.AckError, "Measurement failed."):
+                await measure_task
+
+    async def test_load_sa_template_file(self) -> None:
+
+        async with self.make_csc(
+            initial_state=salobj.State.ENABLED,
+            override="",
+            config_dir=TEST_CONFIG_DIR,
+            simulation_mode=2,
+        ):
+
+            # We have to pass a file local to the SA service, running on
+            # Windows.
+            await self.remote.cmd_loadSATemplateFile.set_start(
+                file=(
+                    r"C:\\Program Files (x86)\\New River "
+                    r"Kinematics\\T2SA\\T2SATemplateManual2022_07_19.xit64"
+                ),
+                timeout=STD_TIMEOUT,
+            )
+
+    async def test_load_sa_template_file_bad_path(self) -> None:
+
+        async with self.make_csc(
+            initial_state=salobj.State.ENABLED,
+            override="",
+            config_dir=TEST_CONFIG_DIR,
+            simulation_mode=2,
+        ):
+
+            # Use wrong extension
+            with self.assertRaisesRegex(
+                salobj.AckError, "SA Template file not found or loaded."
+            ):
+                await self.remote.cmd_loadSATemplateFile.set_start(
+                    file=(
+                        r"C:\\Program Files (x86)\\New River "
+                        r"Kinematics\\T2SA\\T2SATemplateManual2022_07_19.txt"
+                    ),
+                    timeout=STD_TIMEOUT,
+                )
+
+    async def test_measure_drift_laser_off(self) -> None:
+
+        async with self.make_csc(
+            initial_state=salobj.State.ENABLED,
+            override="",
+            config_dir=TEST_CONFIG_DIR,
+            simulation_mode=2,
+        ):
+
+            with self.assertRaisesRegex(
+                salobj.AckError, " T2SA not ready: Laser status LOFF. Should be 'LON'"
+            ):
+
+                await self.remote.cmd_measureDrift.set_start(
+                    pointgroup="M2", timeout=STD_TIMEOUT
+                )
+
+    async def test_measure_drift(self) -> None:
+
+        async with self.make_csc(
+            initial_state=salobj.State.ENABLED,
+            override="",
+            config_dir=TEST_CONFIG_DIR,
+            simulation_mode=2,
+        ):
+
+            await self.quick_power_on(laser_warmup_time=0.0, wait_warmup=True)
+
+            await self.remote.cmd_measureDrift.set_start(
+                pointgroup="M2",
+                timeout=STD_TIMEOUT,
+            )
+
+            # TODO: Add some check.
+
+    async def test_reset_t2sa(self) -> None:
+
+        async with self.make_csc(
+            initial_state=salobj.State.ENABLED,
+            override="",
+            config_dir=TEST_CONFIG_DIR,
+            simulation_mode=2,
+        ):
+
+            await self.remote.cmd_resetT2SA.start(timeout=STD_TIMEOUT)
+
+            # TODO: Add some checks
+
+    async def test_new_station(self) -> None:
+
+        async with self.make_csc(
+            initial_state=salobj.State.ENABLED,
+            override="",
+            config_dir=TEST_CONFIG_DIR,
+            simulation_mode=2,
+        ):
+
+            await self.remote.cmd_newStation.start(timeout=STD_TIMEOUT)
+
+            # TODO: Add some checks
+
+    async def test_save_job_file_invalid_path(self) -> None:
+
+        async with self.make_csc(
+            initial_state=salobj.State.ENABLED,
+            override="",
+            config_dir=TEST_CONFIG_DIR,
+            simulation_mode=2,
+        ):
+
+            with self.assertRaisesRegex(salobj.AckError, "Save SA job file failed."):
+                await self.remote.cmd_saveJobfile.set_start(
+                    file="/home/user/analyzer_data/test_job", timeout=STD_TIMEOUT
+                )
+
+    async def test_save_job_file(self) -> None:
+
+        async with self.make_csc(
+            initial_state=salobj.State.ENABLED,
+            override="",
+            config_dir=TEST_CONFIG_DIR,
+            simulation_mode=2,
+        ):
+
+            await self.remote.cmd_saveJobfile.set_start(
+                file=r"C:\Analyzer Data\TestJob", timeout=STD_TIMEOUT
+            )
+
+            # TODO: Add some checks
+
+    async def test_align(self) -> None:
+        async with self.make_csc(
+            initial_state=salobj.State.ENABLED,
+            override="",
+            config_dir=TEST_CONFIG_DIR,
+            simulation_mode=2,
+        ):
+
+            await self.quick_power_on(laser_warmup_time=0.0, wait_warmup=True)
+
+            for target in MTAlignment.Target:
+                await self.remote.cmd_align.set_start(
+                    target=target,
+                    timeout=STD_TIMEOUT,
+                )
+
+                offset = await self.assert_next_sample(
+                    self.remote.evt_offsetsPublish,
+                    target=f"Frame{target.name}_0.00_60.00_0.00_1",
+                )
+
+                if target == MTAlignment.Target.M1M3:
+                    # Alignment is with respect to m1m3 so these are 0.0
+                    assert offset.dX == 0.0
+                    assert offset.dY == 0.0
+                    assert offset.dZ == 0.0
+                    assert offset.dRX == 0.0
+                    assert offset.dRY == 0.0
+                    assert offset.dRZ == 0.0
+                else:
+                    assert abs(offset.dX) > 0.0
+                    assert abs(offset.dY) > 0.0
+                    assert abs(offset.dZ) > 0.0
+                    assert abs(offset.dRX) > 0.0
+                    assert abs(offset.dRY) > 0.0
+                    assert abs(offset.dRZ) > 0.0

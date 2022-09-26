@@ -26,37 +26,33 @@ import unittest
 from lsst.ts import MTAlignment
 from lsst.ts.tcpip import LOCAL_HOST
 
+STANDARD_TIMEOUT = 5
+
 
 class ModelTestCase(unittest.IsolatedAsyncioTestCase):
-    """
-    tests the Mock T2SA class. This is a simple stand-in for
-    the T2SA application that we can connect to, and which has
-    canned responses to some simple alignment system commands.
-    """
+    log: logging.Logger
 
     @classmethod
-    def setUpClass(cls):
-        cls.log = logging.getLogger()
-        cls.log.addHandler(logging.StreamHandler())
-        cls.log.setLevel(logging.INFO)
+    def setUpClass(cls) -> None:
+        cls.log = logging.getLogger(__name__)
 
-    async def asyncSetUp(self):
+    async def asyncSetUp(self) -> None:
         self.mock_t2sa = MTAlignment.MockT2SA(port=0, log=self.log)
-        await asyncio.wait_for(self.mock_t2sa.start_task, 5)
+        # Set warmup time to 1.0 second to speed up testing.
+        self.mock_t2sa.laser_warmup_time = 1.0
+        await asyncio.wait_for(self.mock_t2sa.start_task, STANDARD_TIMEOUT)
 
-    async def asyncTearDown(self):
+    async def asyncTearDown(self) -> None:
         if self.mock_t2sa:
-            await asyncio.wait_for(self.mock_t2sa.close(), 5)
+            await asyncio.wait_for(self.mock_t2sa.close(), STANDARD_TIMEOUT)
 
-    async def test_connect(self):
-        """
-        Tests we can connect to the mock T2SA server
-        """
+    async def test_connect(self) -> None:
+        """Tests we can connect to the mock T2SA server."""
         self.model = MTAlignment.AlignmentModel(
             host=LOCAL_HOST,
             port=self.mock_t2sa.port,
             read_timeout=30,
-            simulation_mode=1,
+            t2sa_simulation_mode=1,
             log=self.log,
         )
         await self.model.connect()
@@ -64,43 +60,69 @@ class ModelTestCase(unittest.IsolatedAsyncioTestCase):
         await self.model.disconnect()
         assert not self.model.connected
 
-    async def test_laser_status(self):
-        """
-        Tests mock T2SA reports laser status as "on"
-        """
+    async def test_laser_status(self) -> None:
+        """Tests mock T2SA reports laser status as "on"."""
         self.model = MTAlignment.AlignmentModel(
             host=LOCAL_HOST,
             port=self.mock_t2sa.port,
             read_timeout=30,
-            simulation_mode=1,
+            t2sa_simulation_mode=1,
             log=self.log,
         )
         await self.model.connect()
+        self.log.debug("Query initial laser status. should be LOFF")
+        response = await self.model.send_command("?LSTA")
+        assert response == "LOFF"
+
+        self.log.debug("Power-up laser.")
+        response = await self.model.send_command("!LST:1")
+
+        self.log.debug("Query laser status while warming up, should be WARM.")
+        response = await self.model.send_command("?LSTA")
+        assert "WARM" in response
+
+        self.log.debug("Waiting for laser to finish warming up.")
+        await asyncio.wait_for(
+            self.mock_t2sa.laser_warmup_task, timeout=STANDARD_TIMEOUT
+        )
+
+        self.log.debug("Query laser status, should be LON.")
         response = await self.model.send_command("?LSTA")
         assert response == "LON"
+
         await self.model.disconnect()
 
-    async def test_emp(self):
-        """
-        Tests that we can execute a measurement plan, and that status
-        queries while the tracker is measuring return "EMP"
+    async def test_emp(self) -> None:
+        """Tests that we can execute a measurement plan, and that status
+        queries while the tracker is measuring return "EMP".
         """
         self.model = MTAlignment.AlignmentModel(
             host=LOCAL_HOST,
             port=self.mock_t2sa.port,
             read_timeout=30,
-            simulation_mode=1,
+            t2sa_simulation_mode=1,
             log=self.log,
         )
         await self.model.connect()
+
+        self.log.info("Powering laser on")
+        response = await self.model.send_command("!LST:1")
+        await asyncio.wait_for(
+            self.mock_t2sa.laser_warmup_task, timeout=STANDARD_TIMEOUT
+        )
+        assert response == "Tracker Interface Started: True"
+
         self.log.info("sending measurement commmand")
+
         response = await self.model.send_command("!CMDEXE:M1M3")
+        assert self.mock_t2sa.is_measuring()
         assert response == "ACK300"
-        assert self.mock_t2sa.measuring
+
         self.log.info("sending status check where we expect to receive EMP")
         response2 = await self.model.check_status()
         assert response2.strip() == "EMP"
         await asyncio.sleep(self.mock_t2sa.measurement_duration + 0.2)
+
         self.log.info("sending status check where we expect to receive READY")
         response3 = await self.model.check_status()
         assert response3.strip() == "READY"

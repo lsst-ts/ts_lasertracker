@@ -19,14 +19,5 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-try:
-    from .version import *
-except ImportError:
-    __version__ = "?"
-
-from .alignment_csc import *
-from .alignment_model import *
-from .config_schema import *
-from .errors import *
-from .mock import *
-from .utils import *
+from .mock_t2sa import *
+from .mock_t2sa_point_group import *

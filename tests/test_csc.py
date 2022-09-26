@@ -112,8 +112,9 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             simulation_mode=2,
         ):
 
-            with self.assertRaisesRegex(
-                salobj.AckError, "T2SA not ready: Laser status LOFF. Should be 'LON'"
+            with pytest.raises(
+                salobj.AckError,
+                match="T2SA not ready: Laser status LOFF. Should be 'LON'",
             ):
 
                 await self.remote.cmd_measureTarget.set_start(
@@ -131,8 +132,9 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
             await self.quick_power_on(laser_warmup_time=10.0, wait_warmup=False)
 
-            with self.assertRaisesRegex(
-                salobj.AckError, "T2SA not ready: Laser status WARM. Should be 'LON'"
+            with pytest.raises(
+                salobj.AckError,
+                match="T2SA not ready: Laser status WARM. Should be 'LON'",
             ):
                 await self.remote.cmd_measureTarget.set_start(
                     target="M1M3", timeout=STD_TIMEOUT
@@ -200,8 +202,9 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         ):
 
             # should fail because the laser is initially off.
-            with self.assertRaisesRegex(
-                salobj.AckError, "T2SA not ready: Laser status LOFF. Should be 'LON'"
+            with pytest.raises(
+                salobj.AckError,
+                match="T2SA not ready: Laser status LOFF. Should be 'LON'",
             ):
                 await self.remote.cmd_healthCheck.start(timeout=STD_TIMEOUT)
 
@@ -268,8 +271,9 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             simulation_mode=2,
         ):
 
-            with self.assertRaisesRegex(
-                salobj.AckError, "T2SA not ready: Laser status LOFF. Should be 'LON'"
+            with pytest.raises(
+                salobj.AckError,
+                match="T2SA not ready: Laser status LOFF. Should be 'LON'",
             ):
                 await self.remote.cmd_measurePoint.set_start(
                     collection="A",
@@ -370,7 +374,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             simulation_mode=2,
         ):
 
-            with self.assertRaises(salobj.AckError):
+            with pytest.raises(salobj.AckError):
                 await self.remote.cmd_setWorkingFrame.set_start(
                     workingFrame="INVALID",
                     timeout=STD_TIMEOUT,
@@ -406,7 +410,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             # I am not really sure what should happen in this case. I need
             # to get more informatino from the controller to write this checks
             # I am going to assume the measument command should fail.
-            with self.assertRaisesRegex(salobj.AckError, "Measurement failed."):
+            with pytest.raises(salobj.AckError, match="Measurement failed."):
                 await measure_task
 
     async def test_load_sa_template_file(self) -> None:
@@ -438,8 +442,8 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         ):
 
             # Use wrong extension
-            with self.assertRaisesRegex(
-                salobj.AckError, "SA Template file not found or loaded."
+            with pytest.raises(
+                salobj.AckError, match="SA Template file not found or loaded."
             ):
                 await self.remote.cmd_loadSATemplateFile.set_start(
                     file=(
@@ -458,8 +462,9 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             simulation_mode=2,
         ):
 
-            with self.assertRaisesRegex(
-                salobj.AckError, "T2SA not ready: Laser status LOFF. Should be 'LON'"
+            with pytest.raises(
+                salobj.AckError,
+                match="T2SA not ready: Laser status LOFF. Should be 'LON'",
             ):
 
                 await self.remote.cmd_measureDrift.set_start(
@@ -519,7 +524,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             simulation_mode=2,
         ):
 
-            with self.assertRaisesRegex(salobj.AckError, "Save SA job file failed."):
+            with pytest.raises(salobj.AckError, match="Save SA job file failed."):
                 await self.remote.cmd_saveJobfile.set_start(
                     file="/home/user/analyzer_data/test_job", timeout=STD_TIMEOUT
                 )

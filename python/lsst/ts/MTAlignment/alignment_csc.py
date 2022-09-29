@@ -483,7 +483,7 @@ class AlignmentCSC(salobj.ConfigurableCsc):
 
         while self._run_telemetry_loop:
 
-            status = await self.model.check_status()
+            status = await self.model.get_status()
             if status == "READY":
                 self.laser_status_ready.set()
             else:

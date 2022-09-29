@@ -28,14 +28,15 @@ import time
 from enum import IntEnum
 
 from lsst.ts import tcpip
-from lsst.ts.MTAlignment.utils import (
-    CartesianCoordinate,
-    parse_offsets,
-    parse_single_point_measurement,
-)
+
+from .enums import T2SAErrorCode
+from .utils import CartesianCoordinate, parse_offsets, parse_single_point_measurement
 
 # Log a warning if it takes longer than this (seconds) to read a reply
 LOG_WARNING_TIMEOUT = 5
+
+# The error code returned by the T2SA if busy, as a string
+BUSY_ERR_CODE_STR = str(T2SAErrorCode.CommandRejectedBusy.value)
 
 
 class LaserStatus(IntEnum):
@@ -54,9 +55,18 @@ class TrackerStatus(IntEnum):
 
 
 class T2SAError(Exception):
-    """Error raised by send_command if the T2SA returns an error."""
+    """Error raised by send_command if the T2SA returns an error.
 
-    def __init__(self, error_code: str, message: str) -> None:
+    Parameters
+    ----------
+    error_code : `int`
+        Error code, which should be a `T2SAErrorCode` value.
+        This will be available as an attribute of the same name.
+    message : `str`
+        Error message.
+    """
+
+    def __init__(self, error_code: int, message: str) -> None:
         super().__init__(message)
         self.error_code = error_code
 
@@ -97,7 +107,7 @@ class AlignmentModel:
         self.writer: None | asyncio.StreamWriter = None
         self.first_measurement = True
         self.comm_lock = asyncio.Lock()
-        self.reply_regex = re.compile(r"(ACK|ERR)-(\d\d\d):? +(.*)")
+        self.reply_regex = re.compile(r"(ACK|ERR)-(\d\d\d) +(.*)")
 
     async def connect(self) -> None:
         """Connect to the T2SA.
@@ -145,16 +155,10 @@ class AlignmentModel:
             If a reply other than "EMP" (measuring) or "READY" is seen.
         """
         while True:
-            reply = await self._basic_send_command("?STAT")
-            # Apparently we need to wait an extra 0.5 seconds
-            # even if the tracker reports ready.
-            # If that is false, move this line to the end of the while block
-            await asyncio.sleep(0.5)
+            reply = await self.get_status(dolock=False)
             if reply.startswith("READY"):
                 return
-            # Apparently we ought to only see READY... or EMP
-            # but in fact we see many other replies as well,
-            # so accept and ignore any OK reply that is not READY...
+            await asyncio.sleep(0.2)
 
     async def handle_lost_connection(self) -> None:
         """Handle a connection that is unexpectedly lost."""
@@ -203,7 +207,7 @@ class AlignmentModel:
         Returns
         -------
         reply : `str`
-            The reply, with leading "ACK-300 " and trailing "\r\n" stripped.
+            The reply, with leading "ACK-xxx " and trailing "\r\n" stripped.
 
         Raises
         ------
@@ -215,8 +219,6 @@ class AlignmentModel:
 
         Notes
         -----
-        If the reply is a bare "EMP" then that is what is returned.
-
         If the code times out while waiting for a reply then the connection
         is closed.
         """
@@ -261,30 +263,48 @@ class AlignmentModel:
             raise RuntimeError(err_msg)
 
         reply_str = reply_bytes.decode().strip()
-        if reply_str == "EMP":
-            return reply_str
         reply_match = self.reply_regex.match(reply_str)
         if reply_match is None:
             raise RuntimeError(f"Cannot parse reply {reply_str!r}")
         reply_type, reply_code, reply_body = reply_match.groups()
         if reply_type == "ACK":
             return reply_body
-        raise T2SAError(error_code=reply_code, message=reply_body)
+        else:
+            raise T2SAError(error_code=int(reply_code), message=reply_body)
 
-    async def check_status(self) -> str:
+    async def get_status(self, dolock: bool = True) -> str:
         """Query T2SA for status.
+
+        Parameters
+        ----------
+        dolock : `bool`, optional
+            Lock the communication port? This should always be True
+            (the default) except when called by `wait_for_ready`.
 
         Returns
         -------
         status : `str`
             May include:
 
-            * READY if tracker is ready
-            * 2FACE if executing two-face check
-            * DRIFT if executing drift check
-            * EMP if executing measurement plan
+            * "READY" if tracker is ready
+            * "2FACE" if executing two-face check
+            * "DRIFT" if executing drift check
+            * "BUSY" if busy
+
+        Notes
+        -----
+        "BUSY" is not a string returned by the T2SA. Instead, the T2SA
+        returns ERR-201, which causes `send_command` to raise an exception.
+        This function catches that exception and returns "BUSY".
         """
-        return await self.send_command("?STAT")
+        send_method = self.send_command if dolock else self._basic_send_command
+        try:
+            return await send_method("?STAT")  # type: ignore
+        except T2SAError as e:
+            if e.error_code == T2SAErrorCode.CommandRejectedBusy:
+                return "BUSY"
+            else:
+                raise
 
     async def laser_status(self) -> str:
         """Get laser status.

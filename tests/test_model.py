@@ -92,9 +92,9 @@ class ModelTestCase(unittest.IsolatedAsyncioTestCase):
 
         await self.model.disconnect()
 
-    async def test_emp(self) -> None:
+    async def test_busy(self) -> None:
         """Tests that we can execute a measurement plan, and that status
-        queries while the tracker is measuring return "EMP".
+        queries while the tracker is measuring return busy.
         """
         self.model = MTAlignment.AlignmentModel(
             host=LOCAL_HOST,
@@ -118,12 +118,12 @@ class ModelTestCase(unittest.IsolatedAsyncioTestCase):
         assert self.mock_t2sa.is_measuring()
         assert response == "ACK300"
 
-        self.log.info("sending status check where we expect to receive EMP")
-        response2 = await self.model.check_status()
-        assert response2.strip() == "EMP"
+        self.log.info("sending status check where we expect to receive busy")
+        response = await self.model.get_status()
+        assert response == "BUSY"
         await asyncio.sleep(self.mock_t2sa.measurement_duration + 0.2)
 
         self.log.info("sending status check where we expect to receive READY")
-        response3 = await self.model.check_status()
+        response3 = await self.model.get_status()
         assert response3.strip() == "READY"
         await self.model.disconnect()

@@ -120,8 +120,8 @@ pipeline {
     post {
         always {
             // Change ownership of the workspace to Jenkins for clean up.
-            withEnv(["WHOME=${env.WORKSPACE}"]) {
-                sh 'chown -R 1003:1003 ${WHOME}/'
+            withEnv(["HOME=${env.WORKSPACE}"]) {
+                sh 'chown -R 1003:1003 ${HOME}/'
             }
 
             // The path of xml needed by JUnit is relative to the workspace.

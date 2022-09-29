@@ -84,7 +84,7 @@ class BodyRotation:
 
 def parse_single_point_measurement(
     measurement: str,
-) -> None | CartesianCoordinate:
+) -> CartesianCoordinate:
     """Parse single point measurement.
 
     Parameters
@@ -97,25 +97,24 @@ def parse_single_point_measurement(
     single_point_measurement : `CartesianCoordinate`
         Object with the x,y,z values obtained after parsing the input
         measurement.
+
+    Raises
+    ------
+    RuntimeError
+        If the measurement cannot be parsed.
     """
     measure_match = SINGLE_POINT_MEASURE_REGEX.match(measurement)
-    single_point_measurement = (
-        CartesianCoordinate(
-            **dict([(k, float(v)) for k, v in measure_match.groupdict().items()])
-        )
-        if measure_match is not None
-        else None
-    )
-
-    if single_point_measurement is None:
+    if measure_match is None:
         raise RuntimeError(f"Failed to parse measurement: {measurement}")
 
-    return single_point_measurement
+    return CartesianCoordinate(
+        **dict([(k, float(v)) for k, v in measure_match.groupdict().items()])
+    )
 
 
 def parse_offsets(
     measurement: str,
-) -> dict[str, str | float] | None:
+) -> dict[str, str | float]:
     """Takes a string containing spatial coordinates  from T2SA, and
     returns a dict with the following keys: RefFrame, X, Y, Z, Rx, Ry, Rz,
     and Timestamp.
@@ -135,21 +134,19 @@ def parse_offsets(
     -------
     offset : `dict` [`str`, `str` | `float`]
         Offsets obtained after parsing the input string.
+
+    Raises
+    ------
+    RuntimeError
+        If the measurement cannot be parsed.
     """
-
     measure_match = OFFSET_MEASURE_REGEX.match(measurement)
-    offset = (
-        dict(
-            [
-                (key, float(value) if key != "target" else value)
-                for key, value in measure_match.groupdict().items()
-            ]
-        )
-        if measure_match is not None
-        else None
-    )
-
-    if offset is None:
+    if measure_match is None:
         raise RuntimeError(f"Failed to parse measurement: {measurement}")
 
-    return offset
+    return dict(
+        [
+            (key, float(value) if key != "target" else value)
+            for key, value in measure_match.groupdict().items()
+        ]
+    )

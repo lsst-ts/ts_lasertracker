@@ -27,6 +27,6 @@ except ImportError:
 from .alignment_csc import *
 from .alignment_model import *
 from .config_schema import *
-from .errors import *
+from .enums import *
 from .mock import *
 from .utils import *

@@ -6,6 +6,11 @@
 Version History
 ###############
 
+v0.4.1
+------
+
+* pre-commit: update mypy version and flake8 repo.
+
 v0.4.0
 ------
 

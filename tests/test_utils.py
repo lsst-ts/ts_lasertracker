@@ -1,4 +1,4 @@
-# This file is part of ts_MTAlignment.
+# This file is part of ts_lasertracker.
 #
 # Developed for the Vera C. Rubin Observatory Telescope and Site Systems.
 # This product includes software developed by the LSST Project
@@ -21,7 +21,7 @@
 
 import numpy as np
 import pytest
-from lsst.ts.MTAlignment import utils
+from lsst.ts.lasertracker import utils
 
 
 def test_parse_single_point_measure() -> None:

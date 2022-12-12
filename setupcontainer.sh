@@ -1,6 +1,6 @@
 #!/bin/sh
-# Do the boring setup for a MTAlignment dev container
+# Do the boring setup for a LaserTracker dev container
 
-cd /home/saluser/gitdir/ts_MTAlignment
+cd /home/saluser/gitdir/ts_lasertracker
 eups declare -r . -t $USER
-setup ts_MTAlignment -t $USER
+setup ts_lasertracker -t $USER

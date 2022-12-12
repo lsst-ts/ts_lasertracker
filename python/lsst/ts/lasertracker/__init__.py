@@ -1,4 +1,4 @@
-# This file is part of ts_MTAlignment.
+# This file is part of ts_lasertracker.
 #
 # Developed for the LSST Data Management System.
 # This product includes software developed by the LSST Project
@@ -24,9 +24,9 @@ try:
 except ImportError:
     __version__ = "?"
 
-from .alignment_csc import *
-from .alignment_model import *
 from .config_schema import *
 from .enums import *
+from .laser_tracker_csc import *
 from .mock import *
+from .t2sa_model import *
 from .utils import *

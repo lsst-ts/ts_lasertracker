@@ -1,6 +1,6 @@
-.. py:currentmodule:: lsst.ts.MTAlignment
+.. py:currentmodule:: lsst.ts.lasertracker
 
-.. _lsst.ts.MTAlignment.version_history:
+.. _lsst.ts.lasertracker.version_history:
 
 ###############
 Version History

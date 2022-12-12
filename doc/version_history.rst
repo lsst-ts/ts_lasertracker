@@ -6,6 +6,15 @@
 Version History
 ###############
 
+v0.5.0
+------
+
+* Rename from ts_MTAlignment to ts_lasertracker and make an indexed component.
+  This requires ts_xml 15.
+
+  * Rename AlignmentCSC to LaserTrackerCsc.
+  * Rename AlignmentModel to T2SAModel.
+
 v0.4.1
 ------
 

@@ -24,12 +24,12 @@ pipeline {
     }
     environment {
         // Python module name.
-        MODULE_NAME = 'lsst.ts.MTAlignment'
+        MODULE_NAME = 'lsst.ts.lasertracker'
         // Space-separated list of SAL component names for all IDL files required.
-        IDL_NAMES = 'MTAlignment'
+        IDL_NAMES = 'LaserTracker'
         // Product name for documentation upload; the associated
         // documentation site is `https://{DOC_PRODUCT_NAME}.lsst.io`.
-        DOC_PRODUCT_NAME = 'ts-mtalignment'
+        DOC_PRODUCT_NAME = 'ts-lasertracker'
 
         WORK_BRANCHES = "${GIT_BRANCH} ${CHANGE_BRANCH} develop"
         LSST_IO_CREDS = credentials('lsst-io')

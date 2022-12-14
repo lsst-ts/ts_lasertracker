@@ -1,4 +1,4 @@
-# This file is part of ts_MTAlignment.
+# This file is part of ts_lasertracker.
 #
 # Developed for the Vera C. Rubin Observatory Telescope and Site Systems.
 # This product includes software developed by the LSST Project
@@ -19,29 +19,33 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-__all__ = ["AlignmentCSC", "run_mtalignment"]
+__all__ = ["LaserTrackerCsc", "run_lasertracker"]
 
 import asyncio
 import pathlib
+import types
 import typing
 
 from lsst.ts import salobj, utils
+from lsst.ts.idl.enums.LaserTracker import SalIndex
 
 from . import __version__
-from .alignment_model import AlignmentModel
 from .config_schema import CONFIG_SCHEMA
 from .mock import MockT2SA
+from .t2sa_model import T2SAModel
 from .utils import Target
 
 # The following targets must appear in config.targets
 REQUIRED_TARGETS = {"CAM", "M1M3", "M2"}
 
 
-class AlignmentCSC(salobj.ConfigurableCsc):
+class LaserTrackerCsc(salobj.ConfigurableCsc):
     """CSC to control the MT alignment measurement system.
 
     Parameters
     ----------
+    index : `SalIndex` or `int`
+        SAL index; see `SalIndex` for the allowed values.
     config_dir : `str` (optional)
         Directory of configuration files, or None for the standard
         configuration directory (obtained from `get_default_config_dir`).
@@ -79,21 +83,22 @@ class AlignmentCSC(salobj.ConfigurableCsc):
 
     def __init__(
         self,
+        index: SalIndex | int,
         config_dir: str | pathlib.Path | None = None,
         initial_state: salobj.State = salobj.State.STANDBY,
         override: str = "",
         simulation_mode: int = 0,
     ) -> None:
         super().__init__(
-            name="MTAlignment",
-            index=0,
+            name="LaserTracker",
+            index=index,
             config_schema=CONFIG_SCHEMA,
             config_dir=config_dir,
             initial_state=initial_state,
             override=override,
             simulation_mode=simulation_mode,
         )
-        self.model: None | AlignmentModel = None
+        self.model: None | T2SAModel = None
 
         # These values are only used to tag the data on the T2SA and do not
         # need to have any connection with the actual telescope position.
@@ -132,7 +137,7 @@ class AlignmentCSC(salobj.ConfigurableCsc):
                 self.log.info(
                     f"Connecting alignment model to: {t2sa_host}:{t2sa_port} [mode: {self.simulation_mode}]."
                 )
-                self.model = AlignmentModel(
+                self.model = T2SAModel(
                     host=t2sa_host,
                     port=t2sa_port,
                     read_timeout=self.config.read_timeout,
@@ -176,12 +181,27 @@ class AlignmentCSC(salobj.ConfigurableCsc):
             The configuration, as described by the config schema, as a
             struct-like object.
         """
-        missing_targets = REQUIRED_TARGETS - set(config.targets)
+        instance_dicts = [
+            instance_dict
+            for instance_dict in config.instances
+            if instance_dict["sal_index"] == self.salinfo.index
+        ]
+        if len(instance_dicts) > 1:
+            raise salobj.ExpectedError(
+                f"Duplicate config entries found for sal_index={self.salinfo.index}"
+            )
+        elif len(instance_dicts) == 0:
+            raise salobj.ExpectedError(
+                f"No config found for sal_index={self.salinfo.index}"
+            )
+
+        instance = types.SimpleNamespace(**instance_dicts[0])
+        missing_targets = REQUIRED_TARGETS - set(instance.targets)
         if missing_targets:
             raise RuntimeError(
                 f"config.targets is missing required targets {sorted(missing_targets)}"
             )
-        self.config = config
+        self.config = instance
         if self.model is not None:
             if self.model.connected:
                 await self.model.disconnect()
@@ -543,6 +563,6 @@ class AlignmentCSC(salobj.ConfigurableCsc):
         raise NotImplementedError()
 
 
-def run_mtalignment() -> None:
-    """Run the MTAlignment CSC."""
-    asyncio.run(AlignmentCSC.amain(index=None))
+def run_lasertracker() -> None:
+    """Run the LaserTracker CSC."""
+    asyncio.run(LaserTrackerCsc.amain(index=SalIndex))

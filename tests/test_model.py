@@ -1,4 +1,4 @@
-# This file is part of ts_MTAlignment.
+# This file is part of ts_lasertracker.
 #
 # Developed for the Vera C. Rubin Observatory Telescope and Site Systems.
 # This product includes software developed by the LSST Project
@@ -23,7 +23,7 @@ import asyncio
 import logging
 import unittest
 
-from lsst.ts import MTAlignment
+from lsst.ts import lasertracker
 from lsst.ts.tcpip import LOCAL_HOST
 
 STANDARD_TIMEOUT = 5
@@ -37,7 +37,7 @@ class ModelTestCase(unittest.IsolatedAsyncioTestCase):
         cls.log = logging.getLogger(__name__)
 
     async def asyncSetUp(self) -> None:
-        self.mock_t2sa = MTAlignment.MockT2SA(port=0, log=self.log)
+        self.mock_t2sa = lasertracker.MockT2SA(port=0, log=self.log)
         # Set warmup time to 1.0 second to speed up testing.
         self.mock_t2sa.laser_warmup_time = 1.0
         await asyncio.wait_for(self.mock_t2sa.start_task, STANDARD_TIMEOUT)
@@ -48,7 +48,7 @@ class ModelTestCase(unittest.IsolatedAsyncioTestCase):
 
     async def test_connect(self) -> None:
         """Tests we can connect to the mock T2SA server."""
-        self.model = MTAlignment.AlignmentModel(
+        self.model = lasertracker.T2SAModel(
             host=LOCAL_HOST,
             port=self.mock_t2sa.port,
             read_timeout=30,
@@ -62,7 +62,7 @@ class ModelTestCase(unittest.IsolatedAsyncioTestCase):
 
     async def test_laser_status(self) -> None:
         """Tests mock T2SA reports laser status as "on"."""
-        self.model = MTAlignment.AlignmentModel(
+        self.model = lasertracker.T2SAModel(
             host=LOCAL_HOST,
             port=self.mock_t2sa.port,
             read_timeout=30,
@@ -96,7 +96,7 @@ class ModelTestCase(unittest.IsolatedAsyncioTestCase):
         """Tests that we can execute a measurement plan, and that status
         queries while the tracker is measuring return busy.
         """
-        self.model = MTAlignment.AlignmentModel(
+        self.model = lasertracker.T2SAModel(
             host=LOCAL_HOST,
             port=self.mock_t2sa.port,
             read_timeout=30,

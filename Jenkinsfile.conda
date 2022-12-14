@@ -1,2 +1,2 @@
 @Library('JenkinsShared')_
-CondaPipeline(["ts_config_mttcs"], "ts-mtalignment", "lsst.ts.mtalignment", "noarch")
+CondaPipeline(["ts_config_mttcs"], "ts-lasertracker", "lsst.ts.lasertracker", "noarch")

@@ -1,1 +1,3 @@
-t2sa_host: "140.252.33.8"
+instances:
+  - sal_index: 1
+    t2sa_host: "140.252.33.8"

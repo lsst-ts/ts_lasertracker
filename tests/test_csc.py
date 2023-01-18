@@ -1,4 +1,4 @@
-# This file is part of ts_MTAlignment.
+# This file is part of ts_lasertracker.
 #
 # Developed for the Vera C. Rubin Observatory Telescope and Site Systems.
 # This product includes software developed by the LSST Project
@@ -27,7 +27,8 @@ import unittest
 
 import numpy as np
 import pytest
-from lsst.ts import MTAlignment, salobj
+from lsst.ts import lasertracker, salobj
+from lsst.ts.idl.enums.LaserTracker import SalIndex
 
 STD_TIMEOUT = 15  # standard command timeout (sec)
 TEST_CONFIG_DIR = pathlib.Path(__file__).parent.joinpath("data", "config")
@@ -36,12 +37,14 @@ TEST_CONFIG_DIR = pathlib.Path(__file__).parent.joinpath("data", "config")
 class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
     def basic_make_csc(
         self,
+        index: SalIndex | int,
         config_dir: typing.Union[str, pathlib.Path, None],
         initial_state: typing.Union[salobj.State, int],
         override: str = "",
         simulation_mode: int = 2,
-    ) -> MTAlignment.AlignmentCSC:
-        csc = MTAlignment.AlignmentCSC(
+    ) -> lasertracker.LaserTrackerCsc:
+        csc = lasertracker.LaserTrackerCsc(
+            index=index,
             config_dir=config_dir,
             initial_state=initial_state,
             override=override,
@@ -70,13 +73,14 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
     async def test_bin_script(self) -> None:
         await self.check_bin_script(
-            name="MTAlignment",
-            index=0,
-            exe_name="run_mtalignment",
+            name="LaserTracker",
+            index=1,
+            exe_name="run_lasertracker",
         )
 
     async def test_standard_state_transitions(self) -> None:
         async with self.make_csc(
+            index=SalIndex.OTHER,
             config_dir=TEST_CONFIG_DIR,
             initial_state=salobj.State.STANDBY,
             override="",
@@ -106,6 +110,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
     async def test_measure_target_laser_off(self) -> None:
 
         async with self.make_csc(
+            index=SalIndex.MTAlignment,
             initial_state=salobj.State.ENABLED,
             override="",
             config_dir=TEST_CONFIG_DIR,
@@ -124,6 +129,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
     async def test_measure_target_while_warming(self) -> None:
 
         async with self.make_csc(
+            index=SalIndex.OTHER,
             initial_state=salobj.State.ENABLED,
             override="",
             config_dir=TEST_CONFIG_DIR,
@@ -166,6 +172,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
     async def test_measure_target(self) -> None:
 
         async with self.make_csc(
+            index=SalIndex.MTAlignment,
             initial_state=salobj.State.ENABLED,
             override="",
             config_dir=TEST_CONFIG_DIR,
@@ -195,6 +202,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
     async def test_health_check_fail_laser_off(self) -> None:
 
         async with self.make_csc(
+            index=SalIndex.MTAlignment,
             initial_state=salobj.State.ENABLED,
             override="",
             config_dir=TEST_CONFIG_DIR,
@@ -211,6 +219,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
     async def test_health_check_laser_on(self) -> None:
 
         async with self.make_csc(
+            index=SalIndex.MTAlignment,
             initial_state=salobj.State.ENABLED,
             override="",
             config_dir=TEST_CONFIG_DIR,
@@ -225,8 +234,8 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 log
                 for sublist in [
                     (
-                        f"DEBUG:MTAlignment:Running two face check for {target}.",
-                        f"DEBUG:MTAlignment:Measuring drift for {target}.",
+                        f"DEBUG:LaserTracker:Running two face check for {target}.",
+                        f"DEBUG:LaserTracker:Measuring drift for {target}.",
                     )
                     for target in ["CAM", "M1M3", "M2"]
                 ]
@@ -238,6 +247,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
     async def test_laser_power(self) -> None:
         async with self.make_csc(
+            index=SalIndex.MTAlignment,
             initial_state=salobj.State.ENABLED,
             override="",
             config_dir=TEST_CONFIG_DIR,
@@ -265,6 +275,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
     async def test_measure_point_laser_off(self) -> None:
         async with self.make_csc(
+            index=SalIndex.MTAlignment,
             initial_state=salobj.State.ENABLED,
             override="",
             config_dir=TEST_CONFIG_DIR,
@@ -284,6 +295,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
     async def test_measure_point(self) -> None:
         async with self.make_csc(
+            index=SalIndex.MTAlignment,
             initial_state=salobj.State.ENABLED,
             override="",
             config_dir=TEST_CONFIG_DIR,
@@ -313,6 +325,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
     async def test_point_delta(self) -> None:
         async with self.make_csc(
+            index=SalIndex.MTAlignment,
             initial_state=salobj.State.ENABLED,
             override="",
             config_dir=TEST_CONFIG_DIR,
@@ -334,6 +347,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
     async def test_set_reference_group(self) -> None:
 
         async with self.make_csc(
+            index=SalIndex.MTAlignment,
             initial_state=salobj.State.ENABLED,
             override="",
             config_dir=TEST_CONFIG_DIR,
@@ -352,6 +366,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
     async def test_set_working_frame(self) -> None:
 
         async with self.make_csc(
+            index=SalIndex.MTAlignment,
             initial_state=salobj.State.ENABLED,
             override="",
             config_dir=TEST_CONFIG_DIR,
@@ -368,6 +383,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
     async def test_set_working_frame_invalid(self) -> None:
 
         async with self.make_csc(
+            index=SalIndex.MTAlignment,
             initial_state=salobj.State.ENABLED,
             override="",
             config_dir=TEST_CONFIG_DIR,
@@ -385,6 +401,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
     async def test_halt(self) -> None:
 
         async with self.make_csc(
+            index=SalIndex.MTAlignment,
             initial_state=salobj.State.ENABLED,
             override="",
             config_dir=TEST_CONFIG_DIR,
@@ -416,6 +433,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
     async def test_load_sa_template_file(self) -> None:
 
         async with self.make_csc(
+            index=SalIndex.MTAlignment,
             initial_state=salobj.State.ENABLED,
             override="",
             config_dir=TEST_CONFIG_DIR,
@@ -435,6 +453,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
     async def test_load_sa_template_file_bad_path(self) -> None:
 
         async with self.make_csc(
+            index=SalIndex.MTAlignment,
             initial_state=salobj.State.ENABLED,
             override="",
             config_dir=TEST_CONFIG_DIR,
@@ -456,6 +475,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
     async def test_measure_drift_laser_off(self) -> None:
 
         async with self.make_csc(
+            index=SalIndex.MTAlignment,
             initial_state=salobj.State.ENABLED,
             override="",
             config_dir=TEST_CONFIG_DIR,
@@ -474,6 +494,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
     async def test_measure_drift(self) -> None:
 
         async with self.make_csc(
+            index=SalIndex.MTAlignment,
             initial_state=salobj.State.ENABLED,
             override="",
             config_dir=TEST_CONFIG_DIR,
@@ -492,6 +513,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
     async def test_reset_t2sa(self) -> None:
 
         async with self.make_csc(
+            index=SalIndex.MTAlignment,
             initial_state=salobj.State.ENABLED,
             override="",
             config_dir=TEST_CONFIG_DIR,
@@ -505,6 +527,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
     async def test_new_station(self) -> None:
 
         async with self.make_csc(
+            index=SalIndex.MTAlignment,
             initial_state=salobj.State.ENABLED,
             override="",
             config_dir=TEST_CONFIG_DIR,
@@ -518,6 +541,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
     async def test_save_job_file_invalid_path(self) -> None:
 
         async with self.make_csc(
+            index=SalIndex.MTAlignment,
             initial_state=salobj.State.ENABLED,
             override="",
             config_dir=TEST_CONFIG_DIR,
@@ -532,6 +556,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
     async def test_save_job_file(self) -> None:
 
         async with self.make_csc(
+            index=SalIndex.MTAlignment,
             initial_state=salobj.State.ENABLED,
             override="",
             config_dir=TEST_CONFIG_DIR,
@@ -546,6 +571,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
     async def test_align(self) -> None:
         async with self.make_csc(
+            index=SalIndex.MTAlignment,
             initial_state=salobj.State.ENABLED,
             override="",
             config_dir=TEST_CONFIG_DIR,
@@ -554,7 +580,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
             await self.quick_power_on(laser_warmup_time=0.0, wait_warmup=True)
 
-            for target in MTAlignment.Target:
+            for target in lasertracker.Target:
                 await self.remote.cmd_align.set_start(
                     target=target,
                     timeout=STD_TIMEOUT,
@@ -565,7 +591,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                     target=f"Frame{target.name}_0.00_60.00_0.00_1",
                 )
 
-                if target == MTAlignment.Target.M1M3:
+                if target == lasertracker.Target.M1M3:
                     # Alignment is with respect to m1m3 so these are 0.0
                     assert offset.dX == 0.0
                     assert offset.dY == 0.0

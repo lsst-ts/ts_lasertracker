@@ -1,14 +1,14 @@
-.. py:currentmodule:: lsst.ts.mtalignment
+.. py:currentmodule:: lsst.ts.lasertracker
 
-.. _lsst.ts.mtalignment.developer_guide:
+.. _lsst.ts.lasertracker.developer_guide:
 
 ###############
 Developer Guide
 ###############
 
-The MTAlignment CSC is implemented using `ts_salobj <https://github.com/lsst-ts/ts_salobj>`_ and `ts_hexrotcom <https://ts-hexrotcomm.lsst.io>`_.
+The LaserTracker CSC is implemented using `ts_salobj <https://github.com/lsst-ts/ts_salobj>`_ and `ts_tcpip <https://ts-tcpip.lsst.io>`_.
 
-.. _lsst.ts.mtalignment-api:
+.. _lsst.ts.lasertracker-api:
 
 API
 ===
@@ -16,9 +16,9 @@ API
 The primary classes are:
 
 * `AlignmentCSC`: the CSC.
-* `AlignmentModel`: contains most of the implementation and communicates with the 2TSA.
+* `T2SAModel`: contains most of the implementation and communicates with the 2TSA.
 
-.. automodapi:: lsst.ts.MTAlignment
+.. automodapi:: lsst.ts.lasertracker
    :no-main-docstr:
 
 Build and Test
@@ -28,7 +28,7 @@ This is a pure python package. There is nothing to build except the documentatio
 
 .. code-block:: bash
 
-    make_idl_files.py MTAlignment
+    make_idl_files.py LaserTracker
     setup -r .
     pytest -v  # to run tests
     package-docs clean; package-docs build  # to build the documentation
@@ -36,5 +36,5 @@ This is a pure python package. There is nothing to build except the documentatio
 Contributing
 ============
 
-``ts_MTAlignment`` is developed at https://github.com/lsst-ts/ts_MTAlignment.
-You can find Jira issues for this package using `labels=ts_MTAlignment <https://jira.lsstcorp.org/issues/?jql=project%20%3D%20DM%20AND%20labels%20%20%3D%20ts_MTAlignment>`_.
+``ts_lasertracker`` is developed at https://github.com/lsst-ts/ts_lasertracker.
+You can find Jira issues for this package using `labels=ts_lasertracker <https://jira.lsstcorp.org/issues/?jql=project%20%3D%20DM%20AND%20labels%20%20%3D%20ts_lasertracker>`_.

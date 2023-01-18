@@ -1,4 +1,4 @@
-# This file is part of ts_MTAlignment.
+# This file is part of ts_lasertracker.
 #
 # Developed for the Vera C. Rubin Observatory Telescope and Site Systems.
 # This product includes software developed by the LSST Project
@@ -19,7 +19,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-__all__ = ["LaserStatus", "TrackerStatus", "T2SAError", "AlignmentModel"]
+__all__ = ["LaserStatus", "TrackerStatus", "T2SAError", "T2SAModel"]
 
 import asyncio
 import logging
@@ -71,7 +71,7 @@ class T2SAError(Exception):
         self.error_code = error_code
 
 
-class AlignmentModel:
+class T2SAModel:
     """Interface to the T2SA low-level controller.
 
     Parameters
@@ -101,7 +101,7 @@ class AlignmentModel:
         self.port = port
         self.read_timeout = read_timeout
         self.t2sa_simulation_mode = t2sa_simulation_mode
-        self.log = log.getChild("AlignmentModel")
+        self.log = log.getChild("T2SAModel")
 
         self.reader: None | asyncio.StreamReader = None
         self.writer: None | asyncio.StreamWriter = None

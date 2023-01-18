@@ -3,10 +3,10 @@
 This configuration only affects single-package Sphinx documentation builds.
 """
 
-import lsst.ts.MTAlignment  # noqa
+import lsst.ts.lasertracker  # noqa
 from documenteer.conf.pipelinespkg import *  # type: ignore # noqa
 
-project = "ts_MTAlignment"
+project = "ts_lasertracker"
 html_theme_options["logotext"] = project  # type: ignore # noqa
 html_title = project
 html_short_title = project

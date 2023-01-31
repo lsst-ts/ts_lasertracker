@@ -105,25 +105,28 @@ properties:
         single_point_measurement_profile:
           description: Name of Spatial Analyzer measurement profile.
           type: string
-requiredProperties:
-  - sal_index
-  - t2sa_host
-  - t2sa_port
-  - read_timeout
-  - targets
-  - num_iterations
-  - num_samples
-  - randomize_points
-  - station_lock
-  - rms_tolerance
-  - max_tolerance
-  - two_face_az_tolerance
-  - two_face_el_tolerance
-  - two_face_range_tolerance
-  - rms_drift_tolerance
-  - max_drift_tolerance
-  - power_lock
-  - single_point_measurement_profile
+      required:
+        - sal_index
+        - t2sa_host
+        - t2sa_port
+        - read_timeout
+        - targets
+        - num_iterations
+        - num_samples
+        - randomize_points
+        - station_lock
+        - rms_tolerance
+        - max_tolerance
+        - two_face_az_tolerance
+        - two_face_el_tolerance
+        - two_face_range_tolerance
+        - rms_drift_tolerance
+        - max_drift_tolerance
+        - power_lock
+        - single_point_measurement_profile
+      additionalProperties: false
+required:
+  - instances
 additionalProperties: false
 """
 )

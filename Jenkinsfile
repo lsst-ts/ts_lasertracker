@@ -14,12 +14,11 @@ properties([
 ])
 pipeline {
     agent {
-        // Run as root to avoid permission issues when creating files.
         // To run on a specific node, e.g. for a specific architecture, add `label '...'`.
         docker {
             alwaysPull true
             image 'lsstts/develop-env:develop'
-            args "-u root --entrypoint=''"
+            args "--entrypoint=''"
         }
     }
     environment {
@@ -38,7 +37,7 @@ pipeline {
     stages {
         stage ('Update branches of required packages') {
             steps {
-                // When using the docker container, we need to change the HOME path
+                // When using the docker container, we need to change the WHOME path
                 // to WORKSPACE to have the authority to install the packages.
                 withEnv(["WHOME=${env.WORKSPACE}"]) {
                     sh """
@@ -119,11 +118,6 @@ pipeline {
     }
     post {
         always {
-            // Change ownership of the workspace to Jenkins for clean up.
-            withEnv(["HOME=${env.WORKSPACE}"]) {
-                sh 'chown -R 1003:1003 ${HOME}/'
-            }
-
             // The path of xml needed by JUnit is relative to the workspace.
             junit 'jenkinsReport/*.xml'
 

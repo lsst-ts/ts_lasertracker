@@ -6,6 +6,13 @@
 Version History
 ###############
 
+v0.5.1
+------
+
+* `CONFIG_SCHEMA`: fixed the checking for required fields.
+  There were errors in the schema that broke the checking.
+* ``Jenkinsfile``: stop running as root.
+
 v0.5.0
 ------
 

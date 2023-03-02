@@ -126,7 +126,6 @@ class LaserTrackerCsc(salobj.ConfigurableCsc):
             t2sa_port = self.config.t2sa_port
 
             if self.simulation_mode == 2 and self._mock_t2sa is None:
-
                 self.log.debug("Running t2sa mock.")
                 self._mock_t2sa = MockT2SA(log=self.log)
                 await self._mock_t2sa.start_task
@@ -502,7 +501,6 @@ class LaserTrackerCsc(salobj.ConfigurableCsc):
         assert self.model is not None
 
         while self._run_telemetry_loop:
-
             status = await self.model.get_status()
             if status == "READY":
                 self.laser_status_ready.set()

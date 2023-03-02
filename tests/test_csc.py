@@ -108,7 +108,6 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             )
 
     async def test_measure_target_laser_off(self) -> None:
-
         async with self.make_csc(
             index=SalIndex.MTAlignment,
             initial_state=salobj.State.ENABLED,
@@ -116,18 +115,15 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             config_dir=TEST_CONFIG_DIR,
             simulation_mode=2,
         ):
-
             with pytest.raises(
                 salobj.AckError,
                 match="T2SA not ready: Laser status LOFF. Should be 'LON'",
             ):
-
                 await self.remote.cmd_measureTarget.set_start(
                     target="M1M3", timeout=STD_TIMEOUT
                 )
 
     async def test_measure_target_while_warming(self) -> None:
-
         async with self.make_csc(
             index=SalIndex.OTHER,
             initial_state=salobj.State.ENABLED,
@@ -135,7 +131,6 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             config_dir=TEST_CONFIG_DIR,
             simulation_mode=2,
         ):
-
             await self.quick_power_on(laser_warmup_time=10.0, wait_warmup=False)
 
             with pytest.raises(
@@ -170,7 +165,6 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             )
 
     async def test_measure_target(self) -> None:
-
         async with self.make_csc(
             index=SalIndex.MTAlignment,
             initial_state=salobj.State.ENABLED,
@@ -178,7 +172,6 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             config_dir=TEST_CONFIG_DIR,
             simulation_mode=2,
         ):
-
             await self.quick_power_on(laser_warmup_time=0.0, wait_warmup=True)
 
             self.remote.evt_positionPublish.flush()
@@ -200,7 +193,6 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             )
 
     async def test_health_check_fail_laser_off(self) -> None:
-
         async with self.make_csc(
             index=SalIndex.MTAlignment,
             initial_state=salobj.State.ENABLED,
@@ -208,7 +200,6 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             config_dir=TEST_CONFIG_DIR,
             simulation_mode=2,
         ):
-
             # should fail because the laser is initially off.
             with pytest.raises(
                 salobj.AckError,
@@ -217,7 +208,6 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 await self.remote.cmd_healthCheck.start(timeout=STD_TIMEOUT)
 
     async def test_health_check_laser_on(self) -> None:
-
         async with self.make_csc(
             index=SalIndex.MTAlignment,
             initial_state=salobj.State.ENABLED,
@@ -225,7 +215,6 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             config_dir=TEST_CONFIG_DIR,
             simulation_mode=2,
         ):
-
             await self.quick_power_on(laser_warmup_time=0.0, wait_warmup=True)
             with self.assertLogs(self.csc.log, level=logging.DEBUG) as csc_logs:
                 await self.remote.cmd_healthCheck.start(timeout=STD_TIMEOUT)
@@ -253,7 +242,6 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             config_dir=TEST_CONFIG_DIR,
             simulation_mode=2,
         ):
-
             # power on.
             await self.quick_power_on(laser_warmup_time=1.0, wait_warmup=False)
 
@@ -281,7 +269,6 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             config_dir=TEST_CONFIG_DIR,
             simulation_mode=2,
         ):
-
             with pytest.raises(
                 salobj.AckError,
                 match="T2SA not ready: Laser status LOFF. Should be 'LON'",
@@ -301,7 +288,6 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             config_dir=TEST_CONFIG_DIR,
             simulation_mode=2,
         ):
-
             await self.quick_power_on(laser_warmup_time=0.0, wait_warmup=True)
 
             self.remote.evt_positionPublish.flush()
@@ -331,7 +317,6 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             config_dir=TEST_CONFIG_DIR,
             simulation_mode=2,
         ):
-
             await self.quick_power_on(laser_warmup_time=0.0, wait_warmup=True)
 
             await self.remote.cmd_pointDelta.set_start(
@@ -345,7 +330,6 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             )
 
     async def test_set_reference_group(self) -> None:
-
         async with self.make_csc(
             index=SalIndex.MTAlignment,
             initial_state=salobj.State.ENABLED,
@@ -353,7 +337,6 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             config_dir=TEST_CONFIG_DIR,
             simulation_mode=2,
         ):
-
             await self.remote.cmd_setReferenceGroup.set_start(
                 referenceGroup="M2",
                 timeout=STD_TIMEOUT,
@@ -364,7 +347,6 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             assert self.csc._mock_t2sa.reference_frame == "FRAMEM2"
 
     async def test_set_working_frame(self) -> None:
-
         async with self.make_csc(
             index=SalIndex.MTAlignment,
             initial_state=salobj.State.ENABLED,
@@ -372,7 +354,6 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             config_dir=TEST_CONFIG_DIR,
             simulation_mode=2,
         ):
-
             await self.remote.cmd_setWorkingFrame.set_start(
                 workingFrame="",
                 timeout=STD_TIMEOUT,
@@ -381,7 +362,6 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             # TODO: Add some check.
 
     async def test_set_working_frame_invalid(self) -> None:
-
         async with self.make_csc(
             index=SalIndex.MTAlignment,
             initial_state=salobj.State.ENABLED,
@@ -389,7 +369,6 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             config_dir=TEST_CONFIG_DIR,
             simulation_mode=2,
         ):
-
             with pytest.raises(salobj.AckError):
                 await self.remote.cmd_setWorkingFrame.set_start(
                     workingFrame="INVALID",
@@ -399,7 +378,6 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             # TODO: Add some check.
 
     async def test_halt(self) -> None:
-
         async with self.make_csc(
             index=SalIndex.MTAlignment,
             initial_state=salobj.State.ENABLED,
@@ -407,7 +385,6 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             config_dir=TEST_CONFIG_DIR,
             simulation_mode=2,
         ):
-
             await self.quick_power_on(laser_warmup_time=0.0, wait_warmup=True)
 
             measure_task = asyncio.create_task(
@@ -431,7 +408,6 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 await measure_task
 
     async def test_load_sa_template_file(self) -> None:
-
         async with self.make_csc(
             index=SalIndex.MTAlignment,
             initial_state=salobj.State.ENABLED,
@@ -439,7 +415,6 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             config_dir=TEST_CONFIG_DIR,
             simulation_mode=2,
         ):
-
             # We have to pass a file local to the SA service, running on
             # Windows.
             await self.remote.cmd_loadSATemplateFile.set_start(
@@ -451,7 +426,6 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             )
 
     async def test_load_sa_template_file_bad_path(self) -> None:
-
         async with self.make_csc(
             index=SalIndex.MTAlignment,
             initial_state=salobj.State.ENABLED,
@@ -459,7 +433,6 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             config_dir=TEST_CONFIG_DIR,
             simulation_mode=2,
         ):
-
             # Use wrong extension
             with pytest.raises(
                 salobj.AckError, match="SA Template file not found or loaded."
@@ -473,7 +446,6 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 )
 
     async def test_measure_drift_laser_off(self) -> None:
-
         async with self.make_csc(
             index=SalIndex.MTAlignment,
             initial_state=salobj.State.ENABLED,
@@ -481,18 +453,15 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             config_dir=TEST_CONFIG_DIR,
             simulation_mode=2,
         ):
-
             with pytest.raises(
                 salobj.AckError,
                 match="T2SA not ready: Laser status LOFF. Should be 'LON'",
             ):
-
                 await self.remote.cmd_measureDrift.set_start(
                     pointgroup="M2", timeout=STD_TIMEOUT
                 )
 
     async def test_measure_drift(self) -> None:
-
         async with self.make_csc(
             index=SalIndex.MTAlignment,
             initial_state=salobj.State.ENABLED,
@@ -500,7 +469,6 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             config_dir=TEST_CONFIG_DIR,
             simulation_mode=2,
         ):
-
             await self.quick_power_on(laser_warmup_time=0.0, wait_warmup=True)
 
             await self.remote.cmd_measureDrift.set_start(
@@ -511,7 +479,6 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             # TODO: Add some check.
 
     async def test_reset_t2sa(self) -> None:
-
         async with self.make_csc(
             index=SalIndex.MTAlignment,
             initial_state=salobj.State.ENABLED,
@@ -519,13 +486,11 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             config_dir=TEST_CONFIG_DIR,
             simulation_mode=2,
         ):
-
             await self.remote.cmd_resetT2SA.start(timeout=STD_TIMEOUT)
 
             # TODO: Add some checks
 
     async def test_new_station(self) -> None:
-
         async with self.make_csc(
             index=SalIndex.MTAlignment,
             initial_state=salobj.State.ENABLED,
@@ -533,13 +498,11 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             config_dir=TEST_CONFIG_DIR,
             simulation_mode=2,
         ):
-
             await self.remote.cmd_newStation.start(timeout=STD_TIMEOUT)
 
             # TODO: Add some checks
 
     async def test_save_job_file_invalid_path(self) -> None:
-
         async with self.make_csc(
             index=SalIndex.MTAlignment,
             initial_state=salobj.State.ENABLED,
@@ -547,14 +510,12 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             config_dir=TEST_CONFIG_DIR,
             simulation_mode=2,
         ):
-
             with pytest.raises(salobj.AckError, match="Save SA job file failed."):
                 await self.remote.cmd_saveJobfile.set_start(
                     file="/home/user/analyzer_data/test_job", timeout=STD_TIMEOUT
                 )
 
     async def test_save_job_file(self) -> None:
-
         async with self.make_csc(
             index=SalIndex.MTAlignment,
             initial_state=salobj.State.ENABLED,
@@ -562,7 +523,6 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             config_dir=TEST_CONFIG_DIR,
             simulation_mode=2,
         ):
-
             await self.remote.cmd_saveJobfile.set_start(
                 file=r"C:\Analyzer Data\TestJob", timeout=STD_TIMEOUT
             )
@@ -577,7 +537,6 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             config_dir=TEST_CONFIG_DIR,
             simulation_mode=2,
         ):
-
             await self.quick_power_on(laser_warmup_time=0.0, wait_warmup=True)
 
             for target in lasertracker.Target:

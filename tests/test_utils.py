@@ -25,7 +25,6 @@ from lsst.ts.lasertracker import utils
 
 
 def test_parse_single_point_measure() -> None:
-
     for x, y, z in np.round(np.random.rand(3, 3), 6):
         single_point_measure_sample = (
             "Measured single pt M1M3_1 result: "
@@ -41,7 +40,6 @@ def test_parse_single_point_measure() -> None:
 
 
 def test_parse_single_point_measure_bad_data() -> None:
-
     single_point_measure_sample = "Bad data"
 
     with pytest.raises(RuntimeError):
@@ -49,9 +47,7 @@ def test_parse_single_point_measure_bad_data() -> None:
 
 
 def test_parse_offsets() -> None:
-
     for x, y, z, u, v, w in np.round(np.random.rand(3, 6), 6):
-
         offset_measure_sample = (
             "RefFrame:FrameM2_90.00_0.00_0.00_1;"
             f"X:{x};Y:{y};Z:{z};"

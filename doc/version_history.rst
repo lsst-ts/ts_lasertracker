@@ -6,6 +6,11 @@
 Version History
 ###############
 
+v0.5.2
+------
+
+* pre-commit: update the version of black, isort, and mypy.
+
 v0.5.1
 ------
 

@@ -27,7 +27,7 @@ import types
 import typing
 
 from lsst.ts import salobj, utils
-from lsst.ts.idl.enums.LaserTracker import SalIndex
+from lsst.ts.idl.enums.LaserTracker import LaserStatus, SalIndex, T2SAStatus
 
 from . import __version__
 from .config_schema import CONFIG_SCHEMA
@@ -502,12 +502,25 @@ class LaserTrackerCsc(salobj.ConfigurableCsc):
 
         while self._run_telemetry_loop:
             status = await self.model.get_status()
-            if status == "READY":
+            t2sa_status = T2SAStatus(getattr(T2SAStatus, status))
+            if t2sa_status == T2SAStatus.READY:
                 self.laser_status_ready.set()
             else:
                 self.laser_status_ready.clear()
 
-            # TODO (DM-36112): Publish events with telemetry data.
+            await self.evt_t2saStatus.set_write(status=t2sa_status)
+
+            status = await self.model.laser_status()
+
+            if status == "LOW":
+                laser_status = LaserStatus.OFF
+            elif status == "LON":
+                laser_status = LaserStatus.ON
+            else:
+                self.log.warning(f"Invalid Laser Status: {status}")
+                laser_status = LaserStatus.NOT_CONNECTED
+
+            await self.evt_laserStatus.set_write(status=laser_status)
 
             await asyncio.sleep(self.heartbeat_interval)
 

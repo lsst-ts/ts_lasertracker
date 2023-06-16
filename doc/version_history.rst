@@ -6,6 +6,11 @@
 Version History
 ###############
 
+v0.5.3
+------
+
+* fill newly available t2saStatus and laserStatus
+
 v0.5.2
 ------
 

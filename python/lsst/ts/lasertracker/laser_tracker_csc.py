@@ -586,10 +586,14 @@ class LaserTrackerCsc(salobj.ConfigurableCsc):
         if target != "M1M3":
             await self.model.measure_target(target)
 
+        target_frame_name = self.get_target_name(target)
+        reference_frame_name = self.get_target_name("M1M3")
+
         target_offset = await self.model.get_target_offset(
-            target=target, reference_pointgroup="M1M3"
+            target=target_frame_name, reference_pointgroup=reference_frame_name
         )
 
+        target_offset["force_output"] = True
         await self.evt_offsetsPublish.set_write(**target_offset)
 
     async def set_telescope_position(self) -> None:

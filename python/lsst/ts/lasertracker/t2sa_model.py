@@ -139,41 +139,18 @@ class T2SAModel:
                 await tcpip.close_stream_writer(self.writer)
                 self.writer = None
 
-    async def wait_for_ready(self) -> None:
-        """Wait for the tracker to report ready.
-
-        You must obtain self.comm_lock before calling this.
-
-        Check to see if the tracker is executing a measurement plan.
-        If so, hold on to the communication lock until we get a ready signal
-        from the tracker. This is likely to be deprecated later.
-
-        Raises
-        ------
-        RuntimeError
-            If self.comm_lock is not locked.
-            If a reply other than "EMP" (measuring) or "READY" is seen.
-        """
-        while True:
-            reply = await self.get_status(dolock=False)
-            if reply.startswith("READY"):
-                return
-            await asyncio.sleep(0.2)
-
     async def handle_lost_connection(self) -> None:
         """Handle a connection that is unexpectedly lost."""
         if self.writer is not None:
             await tcpip.close_stream_writer(self.writer)
 
-    async def send_command(self, cmd: str, wait_for_ready: bool = False) -> str:
+    async def send_command(self, cmd: str) -> str:
         """Send a command and return the reply.
 
         Parameters
         ----------
         cmd : `str`
             String message to send to T2SA controller.
-        wait_for_ready : `bool`
-            If True, wait for the T2SA to be ready before issuing the command.
 
         Returns
         -------
@@ -188,9 +165,6 @@ class T2SAModel:
             If the reply is an error.
         """
         async with self.comm_lock:
-            if wait_for_ready:
-                self.log.debug(f"Wait for ready before sending command {cmd}")
-                await self.wait_for_ready()
             return await self._basic_send_command(cmd)
 
     async def _basic_send_command(self, cmd: str) -> str:
@@ -385,7 +359,7 @@ class T2SAModel:
         reply : `str`
             ACK300 on success
         """
-        return await self.send_command(f"!CMDEXE:{target}", wait_for_ready=True)
+        return await self.send_command(f"!CMDEXE:{target}")
 
     async def get_target_position(self, target: str) -> dict[str, str | float]:
         """Get the position of the specified target.

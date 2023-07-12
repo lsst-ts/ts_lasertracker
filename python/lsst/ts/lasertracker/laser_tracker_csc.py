@@ -154,7 +154,8 @@ class LaserTrackerCsc(salobj.ConfigurableCsc):
 
             if self.model is None:
                 self.log.info(
-                    f"Connecting alignment model to: {t2sa_host}:{t2sa_port} [mode: {self.simulation_mode}]."
+                    f"Connecting alignment model to: {t2sa_host}:{t2sa_port}, "
+                    f"read_timeout={self.config.read_timeout}s [mode: {self.simulation_mode}]."
                 )
                 self.model = T2SAModel(
                     host=t2sa_host,
@@ -165,7 +166,8 @@ class LaserTrackerCsc(salobj.ConfigurableCsc):
                 )
                 await self.model.connect()
                 self.log.debug(
-                    f"connected to t2sa at {self.model.host}:{self.model.port}"
+                    f"Connected to t2sa at {self.model.host}:{self.model.port}. "
+                    "Setting telescope position."
                 )
 
             if self.telemetry_loop_task.done():

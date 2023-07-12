@@ -769,7 +769,9 @@ class T2SAModel:
         -------
         ACK300 or ERR code
         """
-        return await self.send_command("!HALT")
+        await self._basic_send_command("!HALT", no_wait_reply=True)
+        async with self.comm_lock:
+            return await self._wait_reply(cmd="!HALT")
 
     async def set_telescope_position(
         self, telalt: float, telaz: float, camrot: float

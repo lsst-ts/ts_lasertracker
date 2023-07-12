@@ -444,7 +444,7 @@ class T2SAModel:
             reference_pointgroup = target
 
         target_offset_response = await self.send_command(
-            f"?OFFSET:{reference_pointgroup};{target}"
+            f"?OFFSET:{target};{reference_pointgroup}"
         )
 
         return parse_offsets(target_offset_response)

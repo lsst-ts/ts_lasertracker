@@ -308,9 +308,38 @@ class LaserTrackerCsc(salobj.ConfigurableCsc):
         """
         self.assert_enabled()
 
+        assert self.model is not None
+
+        await self.cmd_align.ack_in_progress(
+            data,
+            timeout=self.model.read_timeout,
+            result=f"Aligning {data.target}.",
+        )
+
         target = Target(data.target)
 
-        await self.measure_alignment(target=target.name)
+        ack_task = asyncio.create_task(self._ack_align_in_progress(data))
+
+        try:
+            await self.measure_alignment(target=target.name)
+        finally:
+            ack_task.cancel()
+            try:
+                await ack_task
+            except asyncio.CancelledError:
+                pass
+
+    async def _ack_align_in_progress(self, data: salobj.BaseDdsDataType) -> None:
+        assert self.model is not None
+
+        while True:
+            await self.cmd_align.ack_in_progress(
+                data,
+                timeout=self.model.read_timeout,
+                result=f"Aligning {data.target}.",
+            )
+
+            await asyncio.sleep(self.heartbeat_interval)
 
     async def do_healthCheck(self, data: salobj.BaseDdsDataType) -> None:
         """Execute health check.

@@ -167,21 +167,48 @@ class T2SAModel:
         async with self.comm_lock:
             return await self._basic_send_command(cmd)
 
-    async def _basic_send_command(self, cmd: str) -> str:
+    async def _basic_send_command(self, cmd: str, no_wait_reply: bool = False) -> str:
         """Send a command and return the reply, without locking.
 
         You must obtain self.comm_lock before calling.
-        This exists to support wait_for_ready and send_command.
+        This exists to support send_command.
 
         Parameters
         ----------
         cmd : `str`
             Command to write, with no "\r\n" terminator.
+        no_wait_reply : `bool`
+            Don't wait for reply from the controller.
 
         Returns
         -------
         reply : `str`
             The reply, with leading "ACK-xxx " and trailing "\r\n" stripped.
+        """
+        if not self.comm_lock.locked():
+            self.log.warning("Communication not locked!")
+        if not self.connected:
+            raise RuntimeError("Not connected")
+
+        assert self.writer is not None
+
+        cmd_bytes = cmd.encode() + tcpip.TERMINATOR
+        self.log.debug(f"Send command {cmd_bytes!r}")
+        self.writer.write(cmd_bytes)
+        await self.writer.drain()
+
+        if no_wait_reply:
+            return ""
+
+        return await self._wait_reply(cmd=cmd)
+
+    async def _wait_reply(self, cmd: str) -> str:
+        """Wait for reply from the controller.
+
+        Parameters
+        ----------
+        cmd : `str`
+            Name of the command executed.
 
         Raises
         ------
@@ -196,19 +223,7 @@ class T2SAModel:
         If the code times out while waiting for a reply then the connection
         is closed.
         """
-        if not self.comm_lock.locked():
-            raise RuntimeError("You must obtain the command lock first")
-        if not self.connected:
-            raise RuntimeError("Not connected")
-
-        assert self.writer is not None
         assert self.reader is not None
-
-        cmd_bytes = cmd.encode() + tcpip.TERMINATOR
-        self.log.debug(f"Send command {cmd_bytes!r}")
-        self.writer.write(cmd_bytes)
-        await self.writer.drain()
-
         try:
             t0 = time.monotonic()
             reply_bytes = await asyncio.wait_for(
@@ -219,7 +234,7 @@ class T2SAModel:
             if dt > LOG_WARNING_TIMEOUT:
                 self.log.warning(
                     f"Took {dt:0.2f} seconds to read {reply_bytes!r} "
-                    f"in response to command {cmd_bytes!r}"
+                    f"in response to command {cmd}"
                 )
             else:
                 self.log.debug(f"Received reply: {reply_bytes!r}")
@@ -231,9 +246,9 @@ class T2SAModel:
         except asyncio.TimeoutError:
             err_msg = (
                 f"Timed out while waiting for a reply to command {cmd}; disconnecting"
+                f"Read timeout: {self.read_timeout}s. Wait time {time.monotonic()-t0}s."
             )
             self.log.error(err_msg)
-            # await self.handle_lost_connection()
             raise RuntimeError(err_msg)
 
         reply_str = reply_bytes.decode().strip()

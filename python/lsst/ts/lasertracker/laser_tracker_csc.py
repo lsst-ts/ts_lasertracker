@@ -354,8 +354,20 @@ class LaserTrackerCsc(salobj.ConfigurableCsc):
 
         self.log.info("Running health check.")
         for target in self.config.targets:
+            await self.cmd_healthCheck.ack_in_progress(
+                data,
+                timeout=self.model.read_timeout,
+                result=f"Running two face check for {target}.",
+            )
+
             self.log.debug(f"Running two face check for {target}.")
             await self.model.twoface_check(target)
+
+            await self.cmd_healthCheck.ack_in_progress(
+                data,
+                timeout=self.model.read_timeout,
+                result=f"Measuring drift for {target}.",
+            )
             self.log.debug(f"Measuring drift for {target}.")
             await self.model.measure_drift(target)
 

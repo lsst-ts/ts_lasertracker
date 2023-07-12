@@ -155,7 +155,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             await self.assert_next_sample(
                 self.remote.evt_positionPublish,
                 flush=False,
-                target="FRAMEM1M3",
+                target="FrameM1M3_0.00_60.00_0.001",
                 dX=pytest.approx(0.0, abs=1e-2),
                 dY=pytest.approx(0.0, abs=1e-2),
                 dZ=pytest.approx(0.0, abs=1e-2),
@@ -183,7 +183,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             await self.assert_next_sample(
                 self.remote.evt_positionPublish,
                 flush=False,
-                target="FRAMEM1M3",
+                target="FrameM1M3_0.00_60.00_0.001",
                 dX=pytest.approx(0.0, abs=1e-2),
                 dY=pytest.approx(0.0, abs=1e-2),
                 dZ=pytest.approx(0.0, abs=1e-2),
@@ -386,6 +386,9 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             simulation_mode=2,
         ):
             await self.quick_power_on(laser_warmup_time=0.0, wait_warmup=True)
+            self.csc._mock_t2sa.measurement_duration = 30.0
+
+            self.csc.timeout_std = 0.1
 
             measure_task = asyncio.create_task(
                 self.remote.cmd_measureTarget.set_start(
@@ -404,7 +407,9 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             # I am not really sure what should happen in this case. I need
             # to get more informatino from the controller to write this checks
             # I am going to assume the measument command should fail.
-            with pytest.raises(salobj.AckError, match="Measurement failed."):
+            with pytest.raises(
+                salobj.AckError, match="Error executing measure plan for M1M3"
+            ):
                 await measure_task
 
     async def test_load_sa_template_file(self) -> None:
@@ -547,7 +552,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
                 offset = await self.assert_next_sample(
                     self.remote.evt_offsetsPublish,
-                    target=f"Frame{target.name}_0.00_60.00_0.00_1",
+                    target=f"Frame{target.name}_0.00_60.00_0.001",
                 )
 
                 if target == lasertracker.Target.M1M3:

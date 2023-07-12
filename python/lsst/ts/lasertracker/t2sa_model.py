@@ -261,14 +261,8 @@ class T2SAModel:
         else:
             raise T2SAError(error_code=int(reply_code), message=reply_body)
 
-    async def get_status(self, dolock: bool = True) -> str:
+    async def get_status(self) -> str:
         """Query T2SA for status.
-
-        Parameters
-        ----------
-        dolock : `bool`, optional
-            Lock the communication port? This should always be True
-            (the default) except when called by `wait_for_ready`.
 
         Returns
         -------
@@ -286,9 +280,8 @@ class T2SAModel:
         returns ERR-201, which causes `send_command` to raise an exception.
         This function catches that exception and returns "BUSY".
         """
-        send_method = self.send_command if dolock else self._basic_send_command
         try:
-            return await send_method("?STAT")  # type: ignore
+            return await self.send_command("?STAT")  # type: ignore
         except T2SAError as e:
             if e.error_code == T2SAErrorCode.CommandRejectedBusy:
                 return "BUSY"

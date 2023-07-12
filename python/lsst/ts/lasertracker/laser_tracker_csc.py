@@ -223,6 +223,7 @@ class LaserTrackerCsc(salobj.ConfigurableCsc):
                 f"config.targets is missing required targets {sorted(missing_targets)}"
             )
         self.config = instance
+        self.log.info(f"Configuration: {self.config}")
         if self.model is not None:
             if self.model.connected:
                 await self.model.disconnect()

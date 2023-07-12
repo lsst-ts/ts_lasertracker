@@ -257,6 +257,32 @@ class LaserTrackerCsc(salobj.ConfigurableCsc):
 
         await self.evt_positionPublish.set_write(**self.last_measurement)
 
+    def get_target_name(self, target: str) -> str:
+        """Return target frame name from target name.
+
+        Parameters
+        ----------
+        target : `str`
+            Target name.
+
+        Returns
+        -------
+        target_name : `str`
+            Target frame name.
+        """
+        return (
+            f"Meas_{target}_"
+            f"{self.elevation:.2f}_"
+            f"{self.azimuth:.2f}_"
+            f"{self.camrot:.2f}"
+            f"{self.group_idx}::"
+            f"Frame{target}_"
+            f"{self.elevation:.2f}_"
+            f"{self.azimuth:.2f}_"
+            f"{self.camrot:.2f}"
+            f"{self.group_idx}"
+        )
+
     async def do_align(self, data: salobj.BaseDdsDataType) -> None:
         """Measure alignment.
 

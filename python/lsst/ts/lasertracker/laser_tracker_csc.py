@@ -109,6 +109,12 @@ class LaserTrackerCsc(salobj.ConfigurableCsc):
         self.elevation = 60
         self.azimuth = 0
         self.camrot = 0
+        self.elevation_default = 60
+        self.azimuth_default = 0
+        self.camrot_default = 0
+        self.group_idx = 1
+
+        self.timeout_std = 5.0
 
         self.last_measurement: dict[str, float | str] | None = None
 
@@ -118,6 +124,20 @@ class LaserTrackerCsc(salobj.ConfigurableCsc):
         self.laser_status_ready = asyncio.Event()
 
         self._mock_t2sa: None | MockT2SA = None
+
+        self.mtmount_remote = salobj.Remote(
+            domain=self.domain,
+            name="MTMount",
+            readonly=True,
+            include=["elevation", "azimuth"],
+        )
+
+        self.mtrotator_remote = salobj.Remote(
+            domain=self.domain,
+            name="MTRotator",
+            readonly=True,
+            include=["rotation"],
+        )
 
     async def handle_summary_state(self) -> None:
         """Override parent class method to handle summary state changes."""
@@ -474,11 +494,7 @@ class LaserTrackerCsc(salobj.ConfigurableCsc):
 
         assert self.model is not None
 
-        await self.model.set_telescope_position(
-            telalt=self.elevation,
-            telaz=self.azimuth,
-            camrot=self.camrot,
-        )
+        await self.set_telescope_position()
 
         await self.model.measure_target("M1M3")
 
@@ -490,6 +506,56 @@ class LaserTrackerCsc(salobj.ConfigurableCsc):
         )
 
         await self.evt_offsetsPublish.set_write(**target_offset)
+
+    async def set_telescope_position(self) -> None:
+        """Set the telescope positions by retrieving values from the mtmount
+        telemetry.
+        """
+        assert self.model is not None
+
+        elevation_data, azimuth_data, rotator_data = await asyncio.gather(
+            self.mtmount_remote.tel_elevation.next(
+                flush=True, timeout=self.timeout_std
+            ),
+            self.mtmount_remote.tel_azimuth.next(flush=True, timeout=self.timeout_std),
+            self.mtrotator_remote.tel_rotation.next(
+                flush=True, timeout=self.timeout_std
+            ),
+            return_exceptions=True,
+        )
+
+        self.elevation = (
+            round(elevation_data.actualPosition, ndigits=2)
+            if not isinstance(elevation_data, Exception)
+            else self.elevation_default
+        )
+        self.azimuth = (
+            round(azimuth_data.actualPosition, ndigits=2)
+            if not isinstance(azimuth_data, Exception)
+            else self.azimuth_default
+        )
+        self.camrot = (
+            round(rotator_data.actualPosition, ndigits=2)
+            if not isinstance(rotator_data, Exception)
+            else self.camrot_default
+        )
+
+        if any(
+            [
+                isinstance(elevation_data, Exception),
+                isinstance(azimuth_data, Exception),
+                isinstance(rotator_data, Exception),
+            ]
+        ):
+            self.log.warning(
+                "Cannot determine one or more of the axis position. Using default value."
+            )
+
+        await self.model.set_telescope_position(
+            telalt=self.elevation,
+            telaz=self.azimuth,
+            camrot=self.camrot,
+        )
 
     async def run_telemetry_loop(self) -> None:
         """Run telemetry loop.

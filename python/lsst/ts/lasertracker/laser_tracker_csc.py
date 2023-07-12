@@ -249,11 +249,28 @@ class LaserTrackerCsc(salobj.ConfigurableCsc):
                 f"Unknown target {data.target}; must one of {self.config.targets}"
             )
 
-        self.laser_status_ready.clear()
-        await self.model.measure_target(data.target)
-        await self.laser_status_ready.wait()
+        await self.cmd_measureTarget.ack_in_progress(
+            data,
+            timeout=self.model.read_timeout,
+            result=f"Measuring {data.target}.",
+        )
 
-        self.last_measurement = await self.model.get_target_position(data.target)
+        await self.set_telescope_position()
+
+        self.log.info(f"Measuring target {data.target}.")
+        await self.model.measure_target(data.target)
+
+        await self.cmd_measureTarget.ack_in_progress(
+            data,
+            timeout=self.model.read_timeout,
+            result="Get target position.",
+        )
+
+        self.log.info("Measurement completed. Publishing target position.")
+
+        target_name = self.get_target_name(data.target)
+
+        self.last_measurement = await self.model.get_target_position(target_name)
 
         await self.evt_positionPublish.set_write(**self.last_measurement)
 

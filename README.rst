@@ -1,5 +1,5 @@
 ##############
-ts_MTAlignment
+ts_lasertracker
 ##############
 
 CSC to control a New River Kinematics T2SA laser alignment system

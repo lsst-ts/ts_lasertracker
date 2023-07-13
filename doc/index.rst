@@ -1,41 +1,41 @@
-.. py:currentmodule:: lsst.ts.mtalignment
+.. py:currentmodule:: lsst.ts.lasertracker
 
-.. _lsst.ts.mtalignment:
+.. _lsst.ts.lasertracker:
 
 ###################
-lsst.ts.mtalignment
+lsst.ts.lasertracker
 ###################
 
 .. image:: https://img.shields.io/badge/Project Metadata-gray.svg
-    :target: https://ts-xml.lsst.io/index.html#index-master-csc-table-mtalignment
+    :target: https://ts-xml.lsst.io/index.html#index-master-csc-table-lasertracker
 .. image:: https://img.shields.io/badge/SAL\ Interface-gray.svg
-    :target: https://ts-xml.lsst.io/sal_interfaces/MTAlignment.html
+    :target: https://ts-xml.lsst.io/sal_interfaces/LaserTracker.html
 .. image:: https://img.shields.io/badge/GitHub-gray.svg
-    :target: https://github.com/lsst-ts/ts_MTAlignment
+    :target: https://github.com/lsst-ts/ts_lasertracker
 .. image:: https://img.shields.io/badge/Jira-gray.svg
-    :target: https://jira.lsstcorp.org/issues/?jql=labels+%3D+ts_MTAlignment
+    :target: https://jira.lsstcorp.org/issues/?jql=labels%3Dts_lasertracker
 
 Overview
 ========
 
-The MTAlignment CSC New River Kinematics T2SA laser alignment system.
+The LaserTracker CSC New River Kinematics T2SA laser alignment system.
 
 User Guide
 ==========
 
-Start the MTAlignment CSC
+Start the LaserTracker CSC
 -------------------------
 
 .. prompt:: bash
 
-    run_mtalignment
+    run_lasertracker
 
-.. _lsst.ts.mtalignment.configuration:
+.. _lsst.ts.lasertracker.configuration:
 
 Configuration
 -------------
 
-Configuration is specified in `ts_config_mttcs <https://github.com/lsst-ts/ts_config_mttcs>`_ following `this schema <https://github.com/lsst-ts/ts_MTAlignment/blob/develop/python/lsst/ts/MTAlignment/config_schema.py>`_.
+Configuration is specified in `ts_config_mttcs <https://github.com/lsst-ts/ts_config_mttcs>`_ following `this schema <https://github.com/lsst-ts/ts_lasertracker/blob/develop/python/lsst/ts/lasertracker/config_schema.py>`_.
 
 Simulator
 ---------
@@ -53,9 +53,9 @@ To run using CSC's internal simulator:
 
 .. prompt:: bash
 
-    run_mtalignment --simulate={mode}
+    run_lasertracker --simulate={mode}
 
-.. _lsst.ts.mtalignment.enable_with_eui:
+.. _lsst.ts.lasertracker.enable_with_eui:
 
 Developer Guide
 ===============

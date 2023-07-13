@@ -1,6 +1,6 @@
 {% set data= load_setup_py_data() %}
 package:
-  name: ts-mtalignment
+  name: ts-lasertracker
   version: {{ data.get('version') }}
 
 source:
@@ -10,7 +10,7 @@ build:
   noarch: generic
   script: {{ PYTHON }} -m pip install --no-deps --ignore-installed .
   entry_points:
-    - run_mtalignment = lsst.ts.MTAlignment:run_mtalignment
+    - run_lasertracker = lsst.ts.lasertracker:run_lasertracker
 
 test:
   requires:
@@ -18,6 +18,7 @@ test:
     - ts-idl {{ idl_version }}
     - ts-salobj {{ salobj_version }}
     - ts-tcpip
+    - scipy
   source_files:
     - python
     - tests
@@ -44,4 +45,4 @@ requirements:
     - ts-salobj
     - ts-idl
     - ts-tcpip
-
+    - scipy

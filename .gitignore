@@ -24,3 +24,5 @@ version.py
 # Editors
 .vscode
 
+# pypi directory.
+*egg-info*

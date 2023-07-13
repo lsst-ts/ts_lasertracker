@@ -14,22 +14,21 @@ properties([
 ])
 pipeline {
     agent {
-        // Run as root to avoid permission issues when creating files.
         // To run on a specific node, e.g. for a specific architecture, add `label '...'`.
         docker {
             alwaysPull true
             image 'lsstts/develop-env:develop'
-            args "-u root --entrypoint=''"
+            args "--entrypoint=''"
         }
     }
     environment {
         // Python module name.
-        MODULE_NAME = 'lsst.ts.MTAlignment'
+        MODULE_NAME = 'lsst.ts.lasertracker'
         // Space-separated list of SAL component names for all IDL files required.
-        IDL_NAMES = 'MTAlignment'
+        IDL_NAMES = 'LaserTracker'
         // Product name for documentation upload; the associated
         // documentation site is `https://{DOC_PRODUCT_NAME}.lsst.io`.
-        DOC_PRODUCT_NAME = 'ts-mtalignment'
+        DOC_PRODUCT_NAME = 'ts-lasertracker'
 
         WORK_BRANCHES = "${GIT_BRANCH} ${CHANGE_BRANCH} develop"
         LSST_IO_CREDS = credentials('lsst-io')
@@ -38,7 +37,7 @@ pipeline {
     stages {
         stage ('Update branches of required packages') {
             steps {
-                // When using the docker container, we need to change the HOME path
+                // When using the docker container, we need to change the WHOME path
                 // to WORKSPACE to have the authority to install the packages.
                 withEnv(["WHOME=${env.WORKSPACE}"]) {
                     sh """
@@ -119,11 +118,6 @@ pipeline {
     }
     post {
         always {
-            // Change ownership of the workspace to Jenkins for clean up.
-            withEnv(["WHOME=${env.WORKSPACE}"]) {
-                sh 'chown -R 1003:1003 ${WHOME}/'
-            }
-
             // The path of xml needed by JUnit is relative to the workspace.
             junit 'jenkinsReport/*.xml'
 

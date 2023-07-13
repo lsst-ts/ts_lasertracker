@@ -1,4 +1,4 @@
-# This file is part of ts_MTAlignment.
+# This file is part of ts_lasertracker.
 #
 # Developed for the Vera C. Rubin Observatory Telescope and Site Systems.
 # This product includes software developed by the LSST Project
@@ -21,49 +21,62 @@
 
 __all__ = ["T2SAErrorCode"]
 
-from enum import IntEnum
+import enum
 
 
-class T2SAErrorCode(IntEnum):
-    """Error codes in T2SA replies."""
+class T2SAErrorCode(enum.IntEnum):
+    """Error codes returned by T2SA.
 
-    NoError = 200
-    CommandRejected = 300
-    FailedToSetLaserOff = 301
+    This is from a spreadsheet supplied by the vendor.
+    """
+
+    CommandRejected = 200
+    CommandRejectedBusy = 201
+    NoError = 300
+    FailedToSetLaserOnOff = 301
     FailedToSetRandomizePoints = 302
-    TwoFaceCheckFailedTolerenceCheck = 303
-
-    DriftCheckFailedToleranceCheck = 304
-    MeasurementOfPointFailed = 305
-    # DidNotFindOrSetPointGroupAndTargetName = 306
+    TwoFaceCheckFailedToleranceChecks = 303
+    DriftCheckFailedToleranceChecks = 304
+    MeasurememtOfPointFailed = 305
+    DidFindOrSetPointGroupAndTargetName = 306
     RequestedMeasurementProfileDoesNotExist = 307
     SAReportTemplateNotFound = 308
-
-    TwoFaceToleraneValueOutsideBoundsToleranceSetToDefault = 309
+    TwoFaceToleranceValueOutsideBoundsToleranceSetToDefault = 309
     DriftToleranceOutsideBoundsDefaultSet = 310
     LeastSquaresToleranceOutsideBounds = 311
-    SATemplateNotFound = 312
+    SATemplateFileNotFound = 312
     RefGroupNotFoundInTemplateFile = 313
-
     WorkingFrameNotFound = 314
     NewStationNotAddedOrCouldNotConnect = 315
-    SaveSAJobFileFileFailed = 316
+    SaveSAJobFileFailed = 316
     SettingLockFailed = 317
     ResetT2SAFailed = 318
-
     CommandToHaltT2SAFailed = 319
     SettingT2SAToTelescopeCurrentPositionFailed = 320
-    FaildSetNumberOfTimesPointsAreSampled = 321
-    CouldNotSetNumberOfMeasurementsPointIterations = 322
-    COuldNotStartInstrumentInterface = 323
-
+    FailedSetNumberOfTimePointsAreSampled = 321
+    CouldNotSetNumberOfMeasurementPointIterations = 322
+    CouldNotStartInstrumentInterface = 323
     ChangeFaceFailed = 324
     FailToCreateMeasuredFrame = 325
-    FailLeastSquareBestFit = 326
-    FailedTOLocateInstrumentToRefPointGroup = 327
+    FailLeastSquaresBestFit = 326
+    FailedToLocateInstrumentToRefPtGrp = 327
     LevelCompensatorNotSet = 328
-
     AddNewStationFailed = 329
     CommandToHaltT2SASucceeded = 330
     FailedToLockStation = 331
     FailedToIncMeasIndex = 332
+    FailedToSetMeasIndex = 333
+    ApplyT2SAToTelescopeCurrentPositionFailed = 334
+    LoadTrackerCompensationFailed = 335
+    FailedToSetMeasInc = 336
+    FailedToSetSim = 337
+    InstrumentNotReady = 338
+    ClearInstrumentErrorFailed = 339
+    FailedPointGroupMeasurement = 340
+    NotConnectedToSA = 341
+    AutoLockNotSet = 342
+    HoldPositionNoBeamLockNotSet = 343
+    SettingFileNotValid = 344
+    SettingT2SAToTelescopeDomeCurrentPositionFailed = 345
+    ObjectNotFoundInSAJob = 346
+    InstrumentIdxNotValid = 347

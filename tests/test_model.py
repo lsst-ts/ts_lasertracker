@@ -91,39 +91,3 @@ class ModelTestCase(unittest.IsolatedAsyncioTestCase):
         assert response == "LON"
 
         await self.model.disconnect()
-
-    async def test_busy(self) -> None:
-        """Tests that we can execute a measurement plan, and that status
-        queries while the tracker is measuring return busy.
-        """
-        self.model = lasertracker.T2SAModel(
-            host=LOCAL_HOST,
-            port=self.mock_t2sa.port,
-            read_timeout=30,
-            t2sa_simulation_mode=1,
-            log=self.log,
-        )
-        await self.model.connect()
-
-        self.log.info("Powering laser on")
-        response = await self.model.send_command("!LST:1")
-        await asyncio.wait_for(
-            self.mock_t2sa.laser_warmup_task, timeout=STANDARD_TIMEOUT
-        )
-        assert response == "Tracker Interface Started: True"
-
-        self.log.info("sending measurement commmand")
-
-        response = await self.model.send_command("!CMDEXE:M1M3")
-        assert self.mock_t2sa.is_measuring()
-        assert response == "ACK300"
-
-        self.log.info("sending status check where we expect to receive busy")
-        response = await self.model.get_status()
-        assert response == "BUSY"
-        await asyncio.sleep(self.mock_t2sa.measurement_duration + 0.2)
-
-        self.log.info("sending status check where we expect to receive READY")
-        response3 = await self.model.get_status()
-        assert response3.strip() == "READY"
-        await self.model.disconnect()

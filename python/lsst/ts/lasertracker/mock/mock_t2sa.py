@@ -29,6 +29,7 @@ import typing
 from lsst.ts import tcpip, utils
 
 from ..enums import T2SAErrorCode
+from ..utils import MEASURE_REGEX
 from .mock_utils import OPTIMAL_POSITION, TelescopePosition, get_random_initial_position
 
 # Good reply bodies. They should come after the initial "ACK-300 " in replies,
@@ -131,7 +132,7 @@ class MockT2SA(tcpip.OneClientServer):
                 (
                     "?OFFSET",
                     self.execute_write_point_group_offset,
-                    r"(?P<reference_group>.*);(?P<point_group>.*)",
+                    r"(?P<point_group>.*);(?P<reference_group>.*)",
                 ),
                 (
                     "?POINT_DELTA",
@@ -139,9 +140,11 @@ class MockT2SA(tcpip.OneClientServer):
                     r"(?P<p1collection>.*);(?P<p1group>.*);(?P<p1>.*);"
                     r"(?P<p2collection>.*);(?P<p2group>.*);(?P<p2>.*)",
                 ),
-                ("?POS CAM", self.execute_write_point_group_position_cam, ""),
-                ("?POS M1M3", self.execute_write_point_group_position_m1m3, ""),
-                ("?POS M2", self.execute_write_point_group_position_m2, ""),
+                (
+                    "?POS",
+                    self.execute_write_point_group_position,
+                    r"(?P<point_group>.*)",
+                ),
                 ("?STAT", self.execute_write_status, ""),
             )
         }
@@ -174,6 +177,8 @@ class MockT2SA(tcpip.OneClientServer):
         self.position_current = get_random_initial_position()
 
         self._telescope_position = TelescopePosition()
+
+        self._commands_reply_tasks: list[asyncio.Task] = []
 
         super().__init__(
             name="MockT2SA",
@@ -229,7 +234,14 @@ class MockT2SA(tcpip.OneClientServer):
         point_group : `str`
             Point group to execute drift measurements (e.g. M1M3, M2, CAM).
         """
-        await self._execute_action("DRIFT", point_group)
+        try:
+            await self._execute_action("DRIFT", point_group)
+        except Exception:
+            self.log.exception("Error execution action.")
+        else:
+            await self._write_reply(
+                f"ACK-106 Successfully ran drift scan for {point_group}"
+            )
 
     async def execute_two_face_check(self, point_group: str) -> None:
         """Simulate a two face check.
@@ -239,7 +251,14 @@ class MockT2SA(tcpip.OneClientServer):
         point_group : `str`
             Point group to execute 2 face check (e.g. M1M3, M2, CAM).
         """
-        await self._execute_action("2FACE", point_group)
+        try:
+            await self._execute_action("2FACE", point_group)
+        except Exception:
+            self.log.exception("Error execution action.")
+        else:
+            await self._write_reply(
+                f"ACK-106 Successfully ran two face check for {point_group}"
+            )
 
     async def execute_measure_plan(self, point_group: str) -> None:
         """Simulate a measurement plan.
@@ -251,19 +270,23 @@ class MockT2SA(tcpip.OneClientServer):
         point_group : `str`
             Point group to measure (e.g. M1M3, M2, CAM).
         """
-        await self._execute_action(BUSY_STATUS, point_group)
+        try:
+            self.log.debug(f"Executing measurement plan for {point_group=}.")
+            await self._execute_action(BUSY_STATUS, point_group)
+        except Exception:
+            self.log.exception("Error execution action.")
+        else:
+            self.log.debug(
+                f"Measurement plan for {point_group=} completed successfully."
+            )
+            await self._write_reply(f"ACK-106 Successfully ran CMD {point_group}")
 
     async def execute_halt(self) -> None:
         """Halt any ongoing measurement."""
         if not self.measure_task.done():
+            self.log.debug("Measure task running, cancelling it.")
             self.measure_task.cancel()
-            try:
-                await self.measure_task
-            except asyncio.CancelledError:
-                pass
-            except Exception:
-                self.log.exception("Error canceling measure task.")
-
+        await asyncio.sleep(0.5)
         self.t2sa_status = T2SA_STATUS_READY
         await self.write_good_reply(self.t2sa_status)
 
@@ -299,22 +322,38 @@ class MockT2SA(tcpip.OneClientServer):
         self.log.debug(f"Executing {action} for {point_group}.")
 
         # Schedule task that will emulate measurement in the background
-        if self.is_measuring():
-            await self.write_good_reply(ALREADY_MEASURING_REPLY)
+        if not self.measure_task.done():
+            await self.write_error_reply(
+                T2SAErrorCode.CommandRejected,
+                "Ongoing measurement.",
+            )
+            raise RuntimeError("Ongoing measurement target.")
         elif not self.is_ready():
             await self.write_error_reply(
                 T2SAErrorCode.CommandRejected,
                 f"T2SA not ready: {self.get_readiness_status()}.",
             )
+            raise RuntimeError(f"T2SA not ready: {self.get_readiness_status()}.")
         elif point_group.lower() not in self.position_optimum:
             await self.write_error_reply(
                 T2SAErrorCode.DidFindOrSetPointGroupAndTargetName,
                 f"No point group {point_group}.",
             )
+            raise RuntimeError(f"No point group {point_group}.")
         else:
             self.t2sa_status = action
             self.measure_task = asyncio.create_task(self.measure())
-            await self.write_good_reply(OK_REPLY)
+            self.log.debug("Waiting for measure task to complete.")
+            try:
+                await self.measure_task
+            except asyncio.CancelledError:
+                await self.write_error_reply(
+                    code=T2SAErrorCode.CommandToHaltT2SASucceeded,
+                    reply=f"Error executing measure plan for {point_group}",
+                )
+                raise RuntimeError("Measure task cancelled!")
+            else:
+                self.log.debug("Measure task completed.")
 
     async def execute_write_status(self) -> None:
         """Write current status."""
@@ -325,6 +364,24 @@ class MockT2SA(tcpip.OneClientServer):
             )
         else:
             await self.write_good_reply(self.t2sa_status)
+
+    async def execute_write_point_group_position(self, point_group: str) -> None:
+        """Write the position of a point group.
+
+        Parameters
+        ----------
+        point_group : `str`
+            Name of the point group.
+        """
+        target = MEASURE_REGEX.match(point_group)
+
+        if target is None:
+            await self.write_error_reply(
+                T2SAErrorCode.DidFindOrSetPointGroupAndTargetName,
+                f"No point group {point_group}.",
+            )
+        else:
+            await self.write_point_group_position(target.groupdict()["target"])
 
     async def execute_write_point_group_position_m1m3(self) -> None:
         """Write the point group position for m1m3."""
@@ -377,19 +434,30 @@ class MockT2SA(tcpip.OneClientServer):
         point_group : `str`
             Which "point group" to get offset for (e.g. M1M3, M2, CAM).
         """
-        if reference_group.lower() not in self.position_optimum:
+        reference_group_match = MEASURE_REGEX.match(reference_group)
+        point_group_match = MEASURE_REGEX.match(point_group)
+        if (
+            reference_group_match is None
+            or reference_group_match.groupdict()["target"].lower()
+            not in self.position_optimum
+        ):
             await self.write_error_reply(
                 T2SAErrorCode.DidFindOrSetPointGroupAndTargetName,
                 f"No reference point group {reference_group}.",
             )
-        elif point_group.lower() not in self.position_current:
+        elif (
+            point_group_match is None
+            or point_group_match.groupdict()["target"].lower()
+            not in self.position_current
+        ):
             await self.write_error_reply(
                 T2SAErrorCode.DidFindOrSetPointGroupAndTargetName,
                 f"No point group {point_group}.",
             )
         else:
             await self._write_offset(
-                reference_group=reference_group.lower(), point_group=point_group.lower()
+                reference_group=reference_group_match.groupdict()["target"].lower(),
+                point_group=point_group_match.groupdict()["target"].lower(),
             )
 
     async def execute_measure_point_delta(
@@ -463,10 +531,10 @@ class MockT2SA(tcpip.OneClientServer):
         )
 
         await self.write_good_reply(
-            f"Measured single pt {p2} result: "
-            f"X:{p2_position.x-p1_position.x};"
-            f"Y:{p2_position.y-p1_position.y};"
-            f"Z:{p2_position.z-p1_position.z};"
+            f"Single Point Measurement {p2} result "
+            f"{p2_position.x-p1_position.x},"
+            f"{p2_position.y-p1_position.y},"
+            f"{p2_position.z-p1_position.z} "
             f"{self._get_time_str()} False"
         )
 
@@ -548,10 +616,10 @@ class MockT2SA(tcpip.OneClientServer):
         ].get_one_fiducial_position(fiducial=point_id)
 
         await self.write_good_reply(
-            f"Measured single pt {point_n} result: "
-            f"X:{point_position.x*1e3:.6f};"
-            f"Y:{point_position.y*1e3:.6f};"
-            f"Z:{point_position.z*1e3:.6f};"
+            f"Single Point Measurement {point_n} result "
+            f"{point_position.x*1e3:.6f},"
+            f"{point_position.y*1e3:.6f},"
+            f"{point_position.z*1e3:.6f} "
             f"{self._get_time_str()} True"
         )
 
@@ -677,7 +745,7 @@ class MockT2SA(tcpip.OneClientServer):
         body = self.position_current[body_name]
 
         await self.write_good_reply(
-            f"RefFrame:{self.reference_frame};"
+            f"Object Offset Report Frame{body_name.upper()}_{self._get_measurement_id()};"
             f"X:{body.origin.x};"
             f"Y:{body.origin.y};"
             f"Z:{body.origin.z};"
@@ -719,7 +787,18 @@ class MockT2SA(tcpip.OneClientServer):
                 if not command:
                     continue
 
-                await self._handle_comand(command)
+                self._commands_reply_tasks.append(
+                    asyncio.create_task(self._handle_comand(command))
+                )
+
+                done_tasks_index = [
+                    i
+                    for i, task in enumerate(self._commands_reply_tasks)
+                    if task.done()
+                ]
+
+                for index in done_tasks_index:
+                    await self._commands_reply_tasks.pop(index)
         except asyncio.CancelledError:
             pass
         except (asyncio.IncompleteReadError, ConnectionResetError):
@@ -806,7 +885,7 @@ class MockT2SA(tcpip.OneClientServer):
         dw = position_point_group.rotation.w - position_reference.rotation.w
 
         await self.write_good_reply(
-            f"RefFrame:Frame{point_group.upper()}_{self._get_measurement_id()};"
+            f"Object Offset Report Frame{point_group.upper()}_{self._get_measurement_id()};"
             f"X:{dx-origin_x};"
             f"Y:{dy-origin_y};"
             f"Z:{dz-origin_z};"
@@ -855,7 +934,7 @@ class MockT2SA(tcpip.OneClientServer):
         return (
             f"{self._telescope_position.azimuth:.2f}_"
             f"{self._telescope_position.elevation:.2f}_"
-            f"{self._telescope_position.rotator:.2f}_1"
+            f"{self._telescope_position.rotator:.2f}1"
         )
 
     async def _write_reply(self, reply: str) -> None:
@@ -909,7 +988,11 @@ class MockT2SA(tcpip.OneClientServer):
         command_kwargs : `dict`[`str`, `str`]
             Dictionary with keywords arguments to pass to ``command_handler``.
         """
-        command_name, _, args_str = command.partition(":")
+        command_name, _, args_str = (
+            command.partition(" ")
+            if command.startswith("?POS")
+            else command.partition(":")
+        )
         command_handler, args_regex = self.dispatchers.get(command_name, (None, None))
 
         if args_regex is not None:

@@ -6,6 +6,60 @@
 Version History
 ###############
 
+v0.6.0
+------
+
+* In ``mock/mock_t2sa.py``, update mock controller to more closely resemble the latest version of T2SA.
+
+  In addition to implementing API changes, makes some improvements in how the mock operates.
+
+* Modernize Jenkinfile to use shared library.
+
+* Update package to use ts-pre-commit-hook.
+
+* Update pyproject to remove black and flake8 checks when running pytest.
+
+* In ``utils.py``, Update ``SINGLE_POINT_MEASURE_REGEX``, ``OFFSET_MEASURE_REGEX`` and add new ``MEASURE_REGEX``.
+
+* In ``t2sa_model.py``:
+
+  * Refactor ``_basic_send_command`` to split the operation between writing the command to the controller and waiting for the reply.
+
+    This also adds the possibility of writing a command and not waiting for the reply.
+
+  * Remove ``wait_for_ready`` method.
+
+    This method was introduced based on a previous iteration of the T2SA operation model, where all command would work in a "fire and forget" mode and the client would wait for the status to be "READY" again before it could operate the system.
+    A recent change to the software changed this behavior such that, now, T2SA sends command acknowledgements with the result of the operation.
+
+  * Change ``get_status`` signature to remove option to lock or not the controller.
+
+    All command now lock the writer and the user can decide if they want to wait for a reply or not.
+
+  * Update ``halt`` model to write the halt command without waiting for the reply, then acquiring the communication lock and waiting for the reply.
+
+  * Update ``get_target_offset`` with the correct order of the components.
+
+* In ``laser_tracker_csc.py``:
+
+  * Update LaserTracker CSC to get the telescope position from the ``MTMount`` telemetry and set the value in the controller.
+
+  * Update ``do_align`` method to send IN_PROGRESS acknowledgements while the measurement is ongoing (to avoid command timeouts).
+
+  * Add new ``get_target_name`` method that will return a string formatted with the target name.
+
+    This is the name T2SA sets for the targets (or groups) based on the position of the telescope and the "group name".
+
+  * Update ``do_measureTarget`` to send IN_PROGRESS acknowledgements and set the telescope position in the controller before making a measurement .
+
+  * Update ``do_healthCheck`` to send ACK_INPROGRESS.
+
+  * Update ``measure_alignment`` to use the new ``get_target_name`` to retrieve the name of the component as expected by T2SA and to force output the events.
+
+  * Update ``handle_summary_state`` to log more information.
+
+  * Update ``configure`` method to log the configuration.
+
 v0.5.3
 ------
 

@@ -27,8 +27,8 @@ from lsst.ts.lasertracker import utils
 def test_parse_single_point_measure() -> None:
     for x, y, z in np.round(np.random.rand(3, 3), 6):
         single_point_measure_sample = (
-            "Measured single pt M1M3_1 result: "
-            f"X:{x};Y:{y};Z:{z};08/19/2022 14:45:43 True"
+            "Single Point Measurement M1M3_1 result "
+            f"{x},{y},{z} 08/19/2022 14:45:43 True"
         )
 
         data = utils.parse_single_point_measurement(single_point_measure_sample)
@@ -49,7 +49,8 @@ def test_parse_single_point_measure_bad_data() -> None:
 def test_parse_offsets() -> None:
     for x, y, z, u, v, w in np.round(np.random.rand(3, 6), 6):
         offset_measure_sample = (
-            "RefFrame:FrameM2_90.00_0.00_0.00_1;"
+            "Object Offset Report "
+            "FrameM2_90.00_0.00_0.00_1;"
             f"X:{x};Y:{y};Z:{z};"
             f"Rx:{u};Ry:{v};Rz:{w};"
             "08/04/2022 16:27:48"

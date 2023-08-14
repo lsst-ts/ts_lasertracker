@@ -139,41 +139,18 @@ class T2SAModel:
                 await tcpip.close_stream_writer(self.writer)
                 self.writer = None
 
-    async def wait_for_ready(self) -> None:
-        """Wait for the tracker to report ready.
-
-        You must obtain self.comm_lock before calling this.
-
-        Check to see if the tracker is executing a measurement plan.
-        If so, hold on to the communication lock until we get a ready signal
-        from the tracker. This is likely to be deprecated later.
-
-        Raises
-        ------
-        RuntimeError
-            If self.comm_lock is not locked.
-            If a reply other than "EMP" (measuring) or "READY" is seen.
-        """
-        while True:
-            reply = await self.get_status(dolock=False)
-            if reply.startswith("READY"):
-                return
-            await asyncio.sleep(0.2)
-
     async def handle_lost_connection(self) -> None:
         """Handle a connection that is unexpectedly lost."""
         if self.writer is not None:
             await tcpip.close_stream_writer(self.writer)
 
-    async def send_command(self, cmd: str, wait_for_ready: bool = False) -> str:
+    async def send_command(self, cmd: str) -> str:
         """Send a command and return the reply.
 
         Parameters
         ----------
         cmd : `str`
             String message to send to T2SA controller.
-        wait_for_ready : `bool`
-            If True, wait for the T2SA to be ready before issuing the command.
 
         Returns
         -------
@@ -188,26 +165,50 @@ class T2SAModel:
             If the reply is an error.
         """
         async with self.comm_lock:
-            if wait_for_ready:
-                self.log.debug(f"Wait for ready before sending command {cmd}")
-                await self.wait_for_ready()
             return await self._basic_send_command(cmd)
 
-    async def _basic_send_command(self, cmd: str) -> str:
+    async def _basic_send_command(self, cmd: str, no_wait_reply: bool = False) -> str:
         """Send a command and return the reply, without locking.
 
         You must obtain self.comm_lock before calling.
-        This exists to support wait_for_ready and send_command.
+        This exists to support send_command.
 
         Parameters
         ----------
         cmd : `str`
             Command to write, with no "\r\n" terminator.
+        no_wait_reply : `bool`
+            Don't wait for reply from the controller.
 
         Returns
         -------
         reply : `str`
             The reply, with leading "ACK-xxx " and trailing "\r\n" stripped.
+        """
+        if not self.comm_lock.locked():
+            self.log.warning("Communication not locked!")
+        if not self.connected:
+            raise RuntimeError("Not connected")
+
+        assert self.writer is not None
+
+        cmd_bytes = cmd.encode() + tcpip.TERMINATOR
+        self.log.debug(f"Send command {cmd_bytes!r}")
+        self.writer.write(cmd_bytes)
+        await self.writer.drain()
+
+        if no_wait_reply:
+            return ""
+
+        return await self._wait_reply(cmd=cmd)
+
+    async def _wait_reply(self, cmd: str) -> str:
+        """Wait for reply from the controller.
+
+        Parameters
+        ----------
+        cmd : `str`
+            Name of the command executed.
 
         Raises
         ------
@@ -222,19 +223,7 @@ class T2SAModel:
         If the code times out while waiting for a reply then the connection
         is closed.
         """
-        if not self.comm_lock.locked():
-            raise RuntimeError("You must obtain the command lock first")
-        if not self.connected:
-            raise RuntimeError("Not connected")
-
-        assert self.writer is not None
         assert self.reader is not None
-
-        cmd_bytes = cmd.encode() + tcpip.TERMINATOR
-        self.log.debug(f"Send command {cmd_bytes!r}")
-        self.writer.write(cmd_bytes)
-        await self.writer.drain()
-
         try:
             t0 = time.monotonic()
             reply_bytes = await asyncio.wait_for(
@@ -245,7 +234,7 @@ class T2SAModel:
             if dt > LOG_WARNING_TIMEOUT:
                 self.log.warning(
                     f"Took {dt:0.2f} seconds to read {reply_bytes!r} "
-                    f"in response to command {cmd_bytes!r}"
+                    f"in response to command {cmd}"
                 )
             else:
                 self.log.debug(f"Received reply: {reply_bytes!r}")
@@ -257,9 +246,9 @@ class T2SAModel:
         except asyncio.TimeoutError:
             err_msg = (
                 f"Timed out while waiting for a reply to command {cmd}; disconnecting"
+                f"Read timeout: {self.read_timeout}s. Wait time {time.monotonic()-t0}s."
             )
             self.log.error(err_msg)
-            # await self.handle_lost_connection()
             raise RuntimeError(err_msg)
 
         reply_str = reply_bytes.decode().strip()
@@ -272,14 +261,8 @@ class T2SAModel:
         else:
             raise T2SAError(error_code=int(reply_code), message=reply_body)
 
-    async def get_status(self, dolock: bool = True) -> str:
+    async def get_status(self) -> str:
         """Query T2SA for status.
-
-        Parameters
-        ----------
-        dolock : `bool`, optional
-            Lock the communication port? This should always be True
-            (the default) except when called by `wait_for_ready`.
 
         Returns
         -------
@@ -297,9 +280,8 @@ class T2SAModel:
         returns ERR-201, which causes `send_command` to raise an exception.
         This function catches that exception and returns "BUSY".
         """
-        send_method = self.send_command if dolock else self._basic_send_command
         try:
-            return await send_method("?STAT")  # type: ignore
+            return await self.send_command("?STAT")  # type: ignore
         except T2SAError as e:
             if e.error_code == T2SAErrorCode.CommandRejectedBusy:
                 return "BUSY"
@@ -385,7 +367,7 @@ class T2SAModel:
         reply : `str`
             ACK300 on success
         """
-        return await self.send_command(f"!CMDEXE:{target}", wait_for_ready=True)
+        return await self.send_command(f"!CMDEXE:{target}")
 
     async def get_target_position(self, target: str) -> dict[str, str | float]:
         """Get the position of the specified target.
@@ -462,7 +444,7 @@ class T2SAModel:
             reference_pointgroup = target
 
         target_offset_response = await self.send_command(
-            f"?OFFSET:{reference_pointgroup};{target}"
+            f"?OFFSET:{target};{reference_pointgroup}"
         )
 
         return parse_offsets(target_offset_response)
@@ -787,7 +769,9 @@ class T2SAModel:
         -------
         ACK300 or ERR code
         """
-        return await self.send_command("!HALT")
+        await self._basic_send_command("!HALT", no_wait_reply=True)
+        async with self.comm_lock:
+            return await self._wait_reply(cmd="!HALT")
 
     async def set_telescope_position(
         self, telalt: float, telaz: float, camrot: float

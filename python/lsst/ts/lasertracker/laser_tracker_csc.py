@@ -109,8 +109,12 @@ class LaserTrackerCsc(salobj.ConfigurableCsc):
         self.elevation = 60
         self.azimuth = 0
         self.camrot = 0
+        self.elevation_default = 60
+        self.azimuth_default = 0
+        self.camrot_default = 0
+        self.group_idx = 1
 
-        self.last_measurement: dict[str, float | str] | None = None
+        self.timeout_std = 5.0
 
         self._run_telemetry_loop = False
         self.telemetry_loop_task: asyncio.Task = utils.make_done_future()
@@ -118,6 +122,20 @@ class LaserTrackerCsc(salobj.ConfigurableCsc):
         self.laser_status_ready = asyncio.Event()
 
         self._mock_t2sa: None | MockT2SA = None
+
+        self.mtmount_remote = salobj.Remote(
+            domain=self.domain,
+            name="MTMount",
+            readonly=True,
+            include=["elevation", "azimuth"],
+        )
+
+        self.mtrotator_remote = salobj.Remote(
+            domain=self.domain,
+            name="MTRotator",
+            readonly=True,
+            include=["rotation"],
+        )
 
     async def handle_summary_state(self) -> None:
         """Override parent class method to handle summary state changes."""
@@ -134,7 +152,8 @@ class LaserTrackerCsc(salobj.ConfigurableCsc):
 
             if self.model is None:
                 self.log.info(
-                    f"Connecting alignment model to: {t2sa_host}:{t2sa_port} [mode: {self.simulation_mode}]."
+                    f"Connecting alignment model to: {t2sa_host}:{t2sa_port}, "
+                    f"read_timeout={self.config.read_timeout}s [mode: {self.simulation_mode}]."
                 )
                 self.model = T2SAModel(
                     host=t2sa_host,
@@ -145,7 +164,8 @@ class LaserTrackerCsc(salobj.ConfigurableCsc):
                 )
                 await self.model.connect()
                 self.log.debug(
-                    f"connected to t2sa at {self.model.host}:{self.model.port}"
+                    f"Connected to t2sa at {self.model.host}:{self.model.port}. "
+                    "Setting telescope position."
                 )
 
             if self.telemetry_loop_task.done():
@@ -201,6 +221,7 @@ class LaserTrackerCsc(salobj.ConfigurableCsc):
                 f"config.targets is missing required targets {sorted(missing_targets)}"
             )
         self.config = instance
+        self.log.info(f"Configuration: {self.config}")
         if self.model is not None:
             if self.model.connected:
                 await self.model.disconnect()
@@ -226,13 +247,56 @@ class LaserTrackerCsc(salobj.ConfigurableCsc):
                 f"Unknown target {data.target}; must one of {self.config.targets}"
             )
 
-        self.laser_status_ready.clear()
+        await self.cmd_measureTarget.ack_in_progress(
+            data,
+            timeout=self.model.read_timeout,
+            result=f"Measuring {data.target}.",
+        )
+
+        await self.set_telescope_position()
+
+        self.log.info(f"Measuring target {data.target}.")
         await self.model.measure_target(data.target)
-        await self.laser_status_ready.wait()
 
-        self.last_measurement = await self.model.get_target_position(data.target)
+        await self.cmd_measureTarget.ack_in_progress(
+            data,
+            timeout=self.model.read_timeout,
+            result="Get target position.",
+        )
 
-        await self.evt_positionPublish.set_write(**self.last_measurement)
+        self.log.info("Measurement completed. Publishing target position.")
+
+        target_name = self.get_target_name(data.target)
+
+        last_measurement = await self.model.get_target_position(target_name)
+
+        await self.evt_positionPublish.set_write(**last_measurement)
+
+    def get_target_name(self, target: str) -> str:
+        """Return target frame name from target name.
+
+        Parameters
+        ----------
+        target : `str`
+            Target name.
+
+        Returns
+        -------
+        target_name : `str`
+            Target frame name.
+        """
+        return (
+            f"Meas_{target}_"
+            f"{self.elevation:.2f}_"
+            f"{self.azimuth:.2f}_"
+            f"{self.camrot:.2f}"
+            f"{self.group_idx}::"
+            f"Frame{target}_"
+            f"{self.elevation:.2f}_"
+            f"{self.azimuth:.2f}_"
+            f"{self.camrot:.2f}"
+            f"{self.group_idx}"
+        )
 
     async def do_align(self, data: salobj.BaseDdsDataType) -> None:
         """Measure alignment.
@@ -244,9 +308,38 @@ class LaserTrackerCsc(salobj.ConfigurableCsc):
         """
         self.assert_enabled()
 
+        assert self.model is not None
+
+        await self.cmd_align.ack_in_progress(
+            data,
+            timeout=self.model.read_timeout,
+            result=f"Aligning {data.target}.",
+        )
+
         target = Target(data.target)
 
-        await self.measure_alignment(target=target.name)
+        ack_task = asyncio.create_task(self._ack_align_in_progress(data))
+
+        try:
+            await self.measure_alignment(target=target.name)
+        finally:
+            ack_task.cancel()
+            try:
+                await ack_task
+            except asyncio.CancelledError:
+                pass
+
+    async def _ack_align_in_progress(self, data: salobj.BaseDdsDataType) -> None:
+        assert self.model is not None
+
+        while True:
+            await self.cmd_align.ack_in_progress(
+                data,
+                timeout=self.model.read_timeout,
+                result=f"Aligning {data.target}.",
+            )
+
+            await asyncio.sleep(self.heartbeat_interval)
 
     async def do_healthCheck(self, data: salobj.BaseDdsDataType) -> None:
         """Execute health check.
@@ -261,8 +354,20 @@ class LaserTrackerCsc(salobj.ConfigurableCsc):
 
         self.log.info("Running health check.")
         for target in self.config.targets:
+            await self.cmd_healthCheck.ack_in_progress(
+                data,
+                timeout=self.model.read_timeout,
+                result=f"Running two face check for {target}.",
+            )
+
             self.log.debug(f"Running two face check for {target}.")
             await self.model.twoface_check(target)
+
+            await self.cmd_healthCheck.ack_in_progress(
+                data,
+                timeout=self.model.read_timeout,
+                result=f"Measuring drift for {target}.",
+            )
             self.log.debug(f"Measuring drift for {target}.")
             await self.model.measure_drift(target)
 
@@ -474,22 +579,72 @@ class LaserTrackerCsc(salobj.ConfigurableCsc):
 
         assert self.model is not None
 
-        await self.model.set_telescope_position(
-            telalt=self.elevation,
-            telaz=self.azimuth,
-            camrot=self.camrot,
-        )
+        await self.set_telescope_position()
 
         await self.model.measure_target("M1M3")
 
         if target != "M1M3":
             await self.model.measure_target(target)
 
+        target_frame_name = self.get_target_name(target)
+        reference_frame_name = self.get_target_name("M1M3")
+
         target_offset = await self.model.get_target_offset(
-            target=target, reference_pointgroup="M1M3"
+            target=target_frame_name, reference_pointgroup=reference_frame_name
         )
 
+        target_offset["force_output"] = True
         await self.evt_offsetsPublish.set_write(**target_offset)
+
+    async def set_telescope_position(self) -> None:
+        """Set the telescope positions by retrieving values from the mtmount
+        telemetry.
+        """
+        assert self.model is not None
+
+        elevation_data, azimuth_data, rotator_data = await asyncio.gather(
+            self.mtmount_remote.tel_elevation.next(
+                flush=True, timeout=self.timeout_std
+            ),
+            self.mtmount_remote.tel_azimuth.next(flush=True, timeout=self.timeout_std),
+            self.mtrotator_remote.tel_rotation.next(
+                flush=True, timeout=self.timeout_std
+            ),
+            return_exceptions=True,
+        )
+
+        self.elevation = (
+            round(elevation_data.actualPosition, ndigits=2)
+            if not isinstance(elevation_data, Exception)
+            else self.elevation_default
+        )
+        self.azimuth = (
+            round(azimuth_data.actualPosition, ndigits=2)
+            if not isinstance(azimuth_data, Exception)
+            else self.azimuth_default
+        )
+        self.camrot = (
+            round(rotator_data.actualPosition, ndigits=2)
+            if not isinstance(rotator_data, Exception)
+            else self.camrot_default
+        )
+
+        if any(
+            [
+                isinstance(elevation_data, Exception),
+                isinstance(azimuth_data, Exception),
+                isinstance(rotator_data, Exception),
+            ]
+        ):
+            self.log.warning(
+                "Cannot determine one or more of the axis position. Using default value."
+            )
+
+        await self.model.set_telescope_position(
+            telalt=self.elevation,
+            telaz=self.azimuth,
+            camrot=self.camrot,
+        )
 
     async def run_telemetry_loop(self) -> None:
         """Run telemetry loop.

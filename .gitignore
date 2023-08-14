@@ -26,3 +26,7 @@ version.py
 
 # pypi directory.
 *egg-info*
+.pre-commit-config.yaml
+.flake8
+.isort.cfg
+.mypy.ini

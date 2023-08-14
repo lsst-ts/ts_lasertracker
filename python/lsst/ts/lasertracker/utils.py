@@ -34,11 +34,16 @@ from dataclasses import dataclass
 import numpy as np
 
 SINGLE_POINT_MEASURE_REGEX = re.compile(
-    r"Measured single pt (.*) result: X:(?P<x>.*);Y:(?P<y>.*);Z:(?P<z>.*);(.*) (.*) (.*)"
+    r"Single Point Measurement (.*) result (?P<x>.*),(?P<y>.*),(?P<z>.*) (.*) (.*) (.*)"
 )
+
 OFFSET_MEASURE_REGEX = re.compile(
-    r"RefFrame:(?P<target>.*);X:(?P<dX>.*);Y:(?P<dY>.*);Z:(?P<dZ>.*);"
+    r"Object Offset Report (?P<target>.*);X:(?P<dX>.*);Y:(?P<dY>.*);Z:(?P<dZ>.*);"
     r"Rx:(?P<dRX>.*);Ry:(?P<dRY>.*);Rz:(?P<dRZ>.*);(.*) (.*)"
+)
+
+MEASURE_REGEX = re.compile(
+    r"Meas_(?P<target>.*)_(?P<elevation>.*)_(?P<azimuth>.*)_(?P<rot>.*)::Frame\1_\2_\3_\4"
 )
 
 

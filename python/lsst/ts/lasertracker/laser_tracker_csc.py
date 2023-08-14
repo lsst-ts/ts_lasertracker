@@ -116,8 +116,6 @@ class LaserTrackerCsc(salobj.ConfigurableCsc):
 
         self.timeout_std = 5.0
 
-        self.last_measurement: dict[str, float | str] | None = None
-
         self._run_telemetry_loop = False
         self.telemetry_loop_task: asyncio.Task = utils.make_done_future()
 
@@ -270,9 +268,9 @@ class LaserTrackerCsc(salobj.ConfigurableCsc):
 
         target_name = self.get_target_name(data.target)
 
-        self.last_measurement = await self.model.get_target_position(target_name)
+        last_measurement = await self.model.get_target_position(target_name)
 
-        await self.evt_positionPublish.set_write(**self.last_measurement)
+        await self.evt_positionPublish.set_write(**last_measurement)
 
     def get_target_name(self, target: str) -> str:
         """Return target frame name from target name.

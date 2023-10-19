@@ -755,7 +755,7 @@ class MockT2SA(tcpip.OneClientServer):
             f"{self._get_time_str()}"
         )
 
-    def run_reply_loop(self, server: tcpip.OneClientServer) -> None:
+    async def run_reply_loop(self, server: tcpip.OneClientServer) -> None:
         """Halt and possibly restart `reply_loop`.
 
         Called when a client connects or disconnects.
@@ -775,7 +775,7 @@ class MockT2SA(tcpip.OneClientServer):
         self.log.debug("reply loop begins")
         try:
             while self.connected:
-                command_bytes = await self.reader.readline()
+                command_bytes = await self.readline()
                 self.log.debug(f"Mock T2SA received command: {command_bytes}")
                 if not command_bytes:
                     self.log.info(
@@ -945,8 +945,7 @@ class MockT2SA(tcpip.OneClientServer):
         reply : `str`
             Reply string.
         """
-        self.writer.write(reply.encode() + tcpip.TERMINATOR)
-        await self.writer.drain()
+        await self.write(reply.encode() + tcpip.TERMINATOR)
 
     async def _warmup_laser(self) -> bool:
         """Simulate warming up the laser."""

@@ -6,6 +6,11 @@
 Version History
 ###############
 
+v0.7.0
+------
+
+* In ``mock/mock_t2sa``, update ``MockT2SA`` to work with ``ts_tcpip>=2.0``.
+
 v0.6.0
 ------
 

@@ -53,11 +53,11 @@ properties:
           description: Timeout for reading T2SA replies to commands (seconds).
           type: number
         targets:
-          description: Names of valid targets. Must include "CAM", "M1M3", and "M2".
+          description: Names of valid targets. Must include "CAM", "M1M3", "M2", "TMA_CENTRAL" and "TMA_UPPER".
           type: array
           items:
             type: string
-          minItems: 3
+          minItems: 5
         num_iterations:
           description: Number of times to repeat measurements of a point group.
           type: number

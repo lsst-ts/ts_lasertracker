@@ -6,6 +6,11 @@
 Version History
 ###############
 
+v0.7.1
+------
+
+* Fixing enums for LaserTracker Status.
+
 v0.7.0
 ------
 

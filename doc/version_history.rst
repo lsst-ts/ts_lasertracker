@@ -6,6 +6,11 @@
 Version History
 ###############
 
+v0.7.1
+------
+
+* Add ``TMA_CENTRAL`` and ``TMA_UPPER`` as targets for Laser Tracker measurements.
+
 v0.7.0
 ------
 

@@ -226,7 +226,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                         f"DEBUG:LaserTracker:Running two face check for {target}.",
                         f"DEBUG:LaserTracker:Measuring drift for {target}.",
                     )
-                    for target in ["CAM", "M1M3", "M2"]
+                    for target in ["CAM", "M1M3", "M2", "TMA_CENTRAL", "TMA_UPPER"]
                 ]
                 for log in sublist
             ]

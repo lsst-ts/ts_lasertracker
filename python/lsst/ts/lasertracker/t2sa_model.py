@@ -40,9 +40,9 @@ BUSY_ERR_CODE_STR = str(T2SAErrorCode.CommandRejectedBusy.value)
 
 
 class LaserStatus(IntEnum):
-    LASERNOTCONNECTED = -1
-    LASEROFF = 0
-    LASERON = 1
+    NOT_CONNECTED = -1
+    OFF = 0
+    ON = 1
 
 
 class TrackerStatus(IntEnum):

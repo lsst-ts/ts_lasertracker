@@ -53,7 +53,9 @@ properties:
           description: Timeout for reading T2SA replies to commands (seconds).
           type: number
         targets:
-          description: Names of valid targets. Must include "CAM", "M1M3", and "M2".
+          description: >-
+            Names of valid targets.
+            Must include "CAM", "M1M3", "M2".
           type: array
           items:
             type: string

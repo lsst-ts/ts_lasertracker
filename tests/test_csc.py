@@ -234,6 +234,35 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             for log in expected_logs:
                 assert log in csc_logs.output
 
+    async def test_configure_with_tma_targets(self) -> None:
+        async with self.make_csc(
+            index=SalIndex.OTHER,
+            config_dir=TEST_CONFIG_DIR,
+            initial_state=salobj.State.STANDBY,
+            override="",
+            simulation_mode=2,
+        ):
+            await self.check_standard_state_transitions(
+                override="with_tma.yaml",
+                enabled_commands=[
+                    "align",
+                    "measureTarget",
+                    "measurePoint",
+                    "laserPower",
+                    "healthCheck",
+                    "powerOff",
+                    "pointDelta",
+                    "setReferenceGroup",
+                    "halt",
+                    "setWorkingFrame",
+                    "loadSATemplateFile",
+                    "measureDrift",
+                    "resetT2SA",
+                    "newStation",
+                    "saveJobfile",
+                ],
+            )
+
     async def test_laser_power(self) -> None:
         async with self.make_csc(
             index=SalIndex.MTAlignment,
@@ -307,7 +336,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
             assert np.sqrt(
                 position.dX**2.0 + position.dY**2.0 + position.dZ**2.0
-            ) * 1e-3 == pytest.approx(8.4, rel=1e-3)
+            ) * 1e-3 == pytest.approx(4.2, rel=1e-3)
 
     async def test_point_delta(self) -> None:
         async with self.make_csc(

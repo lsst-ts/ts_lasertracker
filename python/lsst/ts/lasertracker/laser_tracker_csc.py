@@ -139,36 +139,70 @@ class LaserTrackerCsc(salobj.ConfigurableCsc):
             include=["rotation"],
         )
 
+    async def begin_start(self, data: salobj.BaseDdsDataType) -> None:
+        """Execute before changing state from STANDBY to DISABLED.
+
+        Parameters
+        ----------
+        data : `salobj.BaseDdsDataType`
+            Command payload.
+        """
+        await super().begin_start(data)
+
+        t2sa_host = self.config.t2sa_host
+        t2sa_port = self.config.t2sa_port
+
+        if self.simulation_mode == 2 and self._mock_t2sa is None:
+            self.log.debug("Running t2sa mock.")
+            self._mock_t2sa = MockT2SA(log=self.log)
+            await self._mock_t2sa.start_task
+            t2sa_host = self._mock_t2sa.host
+            t2sa_port = self._mock_t2sa.port
+
+        if self.model is None:
+            self.log.info(
+                f"Connecting alignment model to: {t2sa_host}:{t2sa_port}, "
+                f"read_timeout={self.config.read_timeout}s [mode: {self.simulation_mode}]."
+            )
+            self.model = T2SAModel(
+                host=t2sa_host,
+                port=t2sa_port,
+                read_timeout=self.config.read_timeout,
+                t2sa_simulation_mode=self.simulation_mode == 1,
+                log=self.log,
+            )
+            try:
+                await self.model.connect()
+            except Exception:
+                error_message = (
+                    "Failed to connect to T2SA. "
+                    f"Ensure it is running in {t2sa_host}."
+                )
+
+                self.log.exception(error_message)
+                raise RuntimeError(error_message)
+            self.log.debug(
+                f"Connected to t2sa at {self.model.host}:{self.model.port}. "
+                "Setting telescope position."
+            )
+        elif self.model is not None:
+            if self.model.connected:
+                await self.model.disconnect()
+            await self.model.connect()
+
     async def handle_summary_state(self) -> None:
         """Override parent class method to handle summary state changes."""
         if self.disabled_or_enabled:
-            t2sa_host = self.config.t2sa_host
-            t2sa_port = self.config.t2sa_port
-
-            if self.simulation_mode == 2 and self._mock_t2sa is None:
-                self.log.debug("Running t2sa mock.")
-                self._mock_t2sa = MockT2SA(log=self.log)
-                await self._mock_t2sa.start_task
-                t2sa_host = self._mock_t2sa.host
-                t2sa_port = self._mock_t2sa.port
-
-            if self.model is None:
-                self.log.info(
-                    f"Connecting alignment model to: {t2sa_host}:{t2sa_port}, "
-                    f"read_timeout={self.config.read_timeout}s [mode: {self.simulation_mode}]."
+            if self.model is not None:
+                if not self.model.connected:
+                    await self.model.connect()
+            else:
+                await self.fault(
+                    ErrorCodes.PROGRAMATIC_ERROR,
+                    "Laser tracker interface not defined while is should be. "
+                    "This is most likely a software bug, and should be reported.",
                 )
-                self.model = T2SAModel(
-                    host=t2sa_host,
-                    port=t2sa_port,
-                    read_timeout=self.config.read_timeout,
-                    t2sa_simulation_mode=self.simulation_mode == 1,
-                    log=self.log,
-                )
-                await self.model.connect()
-                self.log.debug(
-                    f"Connected to t2sa at {self.model.host}:{self.model.port}. "
-                    "Setting telescope position."
-                )
+                raise RuntimeError("Laser tracker interface not defined.")
 
             if self.telemetry_loop_task.done():
                 self._run_telemetry_loop = True
@@ -224,10 +258,6 @@ class LaserTrackerCsc(salobj.ConfigurableCsc):
             )
         self.config = instance
         self.log.info(f"Configuration: {self.config}")
-        if self.model is not None:
-            if self.model.connected:
-                await self.model.disconnect()
-            await self.model.connect()
 
     @staticmethod
     def get_config_pkg() -> str:

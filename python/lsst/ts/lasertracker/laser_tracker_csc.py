@@ -23,6 +23,7 @@ __all__ = ["LaserTrackerCsc", "run_lasertracker"]
 
 import asyncio
 import pathlib
+import re
 import traceback
 import types
 import typing
@@ -39,6 +40,8 @@ from .utils import Target
 
 # The following targets must appear in config.targets
 REQUIRED_TARGETS = {"CAM", "M1M3", "M2"}
+reg_exp_lsta_off = re.compile("(.*)LOFF")
+reg_exp_lsta_on = re.compile("(.*)LON")
 
 
 class LaserTrackerCsc(salobj.ConfigurableCsc):
@@ -701,9 +704,9 @@ class LaserTrackerCsc(salobj.ConfigurableCsc):
 
                 status = await self.model.laser_status()
 
-                if status == "LOW":
+                if reg_exp_lsta_off.match(status) is not None:
                     laser_status = LaserStatus.OFF
-                elif status == "LON":
+                elif reg_exp_lsta_on.match(status) is not None:
                     laser_status = LaserStatus.ON
                 else:
                     self.log.warning(f"Invalid Laser Status: {status}")

@@ -245,7 +245,7 @@ class T2SAModel:
             raise RuntimeError(err_msg)
         except asyncio.TimeoutError:
             err_msg = (
-                f"Timed out while waiting for a reply to command {cmd}; disconnecting"
+                f"Timed out while waiting for a reply to command {cmd}. "
                 f"Read timeout: {self.read_timeout}s. Wait time {time.monotonic()-t0}s."
             )
             self.log.error(err_msg)

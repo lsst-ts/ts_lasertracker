@@ -613,27 +613,28 @@ class LaserTrackerCsc(salobj.ConfigurableCsc):
             return_exceptions=True,
         )
 
-        self.elevation = (
-            round(elevation_data.actualPosition, ndigits=2)
-            if not isinstance(elevation_data, Exception)
-            else self.elevation_default
-        )
-        self.azimuth = (
-            round(azimuth_data.actualPosition, ndigits=2)
-            if not isinstance(azimuth_data, Exception)
-            else self.azimuth_default
-        )
-        self.camrot = (
-            round(rotator_data.actualPosition, ndigits=2)
-            if not isinstance(rotator_data, Exception)
-            else self.camrot_default
-        )
+        if not isinstance(elevation_data, Exception):  # type: ignore
+            self.elevation = round(elevation_data.actualPosition, ndigits=2)  # type: ignore
+        else:
+            self.elevation = self.elevation_default
+
+        if not isinstance(azimuth_data, Exception):  # type: ignore
+            self.azimuth = round(azimuth_data.actualPosition, ndigits=2)  # type: ignore
+        else:
+            self.azimuth = self.azimuth_default
+
+        if not isinstance(rotator_data, Exception):  # type: ignore
+            self.camrot = round(rotator_data.actualPosition, ndigits=2)  # type: ignore
+            if self.camrot <= 1e-2:
+                self.camrot = 0
+        else:
+            self.camrot = self.camrot_default
 
         if any(
             [
-                isinstance(elevation_data, Exception),
-                isinstance(azimuth_data, Exception),
-                isinstance(rotator_data, Exception),
+                isinstance(elevation_data, Exception),  # type: ignore
+                isinstance(azimuth_data, Exception),  # type: ignore
+                isinstance(rotator_data, Exception),  # type: ignore
             ]
         ):
             self.log.warning(

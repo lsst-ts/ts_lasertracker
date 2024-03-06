@@ -363,7 +363,7 @@ class MockT2SA(tcpip.OneClientServer):
                 T2SAErrorCode.CommandRejectedBusy, "Command rejected. SA is busy."
             )
         else:
-            await self.write_good_reply(self.t2sa_status)
+            await self.write_good_reply("Instrument is connected")
 
     async def execute_write_point_group_position(self, point_group: str) -> None:
         """Write the position of a point group.

@@ -23,6 +23,7 @@ __all__ = ["LaserTrackerCsc", "run_lasertracker"]
 
 import asyncio
 import pathlib
+import traceback
 import types
 import typing
 
@@ -31,6 +32,7 @@ from lsst.ts.idl.enums.LaserTracker import LaserStatus, SalIndex, T2SAStatus
 
 from . import __version__
 from .config_schema import CONFIG_SCHEMA
+from .enums import ErrorCodes
 from .mock import MockT2SA
 from .t2sa_model import T2SAModel
 from .utils import Target
@@ -657,28 +659,35 @@ class LaserTrackerCsc(salobj.ConfigurableCsc):
         assert self.model is not None
 
         while self._run_telemetry_loop:
-            status = await self.model.get_status()
-            t2sa_status = T2SAStatus(getattr(T2SAStatus, status))
-            if t2sa_status == T2SAStatus.READY:
-                self.laser_status_ready.set()
-            else:
-                self.laser_status_ready.clear()
+            try:
+                status = await self.model.get_status()
+                t2sa_status = T2SAStatus(getattr(T2SAStatus, status))
+                if t2sa_status == T2SAStatus.READY:
+                    self.laser_status_ready.set()
+                else:
+                    self.laser_status_ready.clear()
 
-            await self.evt_t2saStatus.set_write(status=t2sa_status)
+                await self.evt_t2saStatus.set_write(status=t2sa_status)
 
-            status = await self.model.laser_status()
+                status = await self.model.laser_status()
 
-            if status == "LOW":
-                laser_status = LaserStatus.OFF
-            elif status == "LON":
-                laser_status = LaserStatus.ON
-            else:
-                self.log.warning(f"Invalid Laser Status: {status}")
-                laser_status = LaserStatus.NOT_CONNECTED
+                if status == "LOW":
+                    laser_status = LaserStatus.OFF
+                elif status == "LON":
+                    laser_status = LaserStatus.ON
+                else:
+                    self.log.warning(f"Invalid Laser Status: {status}")
+                    laser_status = LaserStatus.NOT_CONNECTED
 
-            await self.evt_laserStatus.set_write(status=laser_status)
+                await self.evt_laserStatus.set_write(status=laser_status)
 
-            await asyncio.sleep(self.heartbeat_interval)
+                await asyncio.sleep(self.heartbeat_interval)
+            except Exception:
+                await self.fault(
+                    code=ErrorCodes.TELEMETRY_LOOP_ERROR,
+                    report="Error in telemetry loop.",
+                    traceback=traceback.format_exc(),
+                )
 
     async def stop_telemetry_loop(self) -> None:
         """Stop the telemetry loop and clean up.

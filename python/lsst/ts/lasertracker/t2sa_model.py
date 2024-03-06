@@ -287,7 +287,10 @@ class T2SAModel:
             else:
                 return "BUSY"
         except T2SAError as e:
-            if e.error_code == T2SAErrorCode.CommandRejectedBusy:
+            if e.error_code in {
+                T2SAErrorCode.InstrumentNotReady,
+                T2SAErrorCode.CommandRejectedBusy,
+            }:
                 return "BUSY"
             else:
                 raise

@@ -281,7 +281,11 @@ class T2SAModel:
         This function catches that exception and returns "BUSY".
         """
         try:
-            return await self.send_command("?STAT")  # type: ignore
+            result = await self.send_command("?STAT")  # type: ignore
+            if result == "Instrument is connected":
+                return "READY"
+            else:
+                return "BUSY"
         except T2SAError as e:
             if e.error_code == T2SAErrorCode.CommandRejectedBusy:
                 return "BUSY"

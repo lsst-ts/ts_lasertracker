@@ -19,9 +19,16 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-__all__ = ["T2SAErrorCode"]
+__all__ = ["ErrorCodes", "T2SAErrorCode"]
 
 import enum
+
+
+class ErrorCodes(enum.IntEnum):
+    """Error codes for the LaserTracker CSC."""
+
+    TELEMETRY_LOOP_ERROR = enum.auto()
+    PROGRAMATIC_ERROR = enum.auto()
 
 
 class T2SAErrorCode(enum.IntEnum):

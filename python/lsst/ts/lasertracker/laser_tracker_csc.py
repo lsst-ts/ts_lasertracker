@@ -35,7 +35,7 @@ from . import __version__
 from .config_schema import CONFIG_SCHEMA
 from .enums import ErrorCodes
 from .mock import MockT2SA
-from .t2sa_model import T2SAModel
+from .t2sa_model import T2SAError, T2SAModel
 from .utils import Target
 
 # The following targets must appear in config.targets
@@ -616,11 +616,31 @@ class LaserTrackerCsc(salobj.ConfigurableCsc):
 
         await self.set_telescope_position()
 
-        await self.model.measure_target("M1M3")
+        try:
+            await self.model.increment_measured_index()
+        finally:
+            self.group_idx += 1
+
+        try:
+            await self.model.measure_target("M1M3")
+        except T2SAError as e:
+            if e.error_code == 305:
+                self.log.exception(
+                    f"T2SA reported error {e.error_code} while measuring target. Ignoring."
+                )
+            else:
+                raise
 
         if target != "M1M3":
-            await self.model.measure_target(target)
-
+            try:
+                await self.model.measure_target(target)
+            except T2SAError as e:
+                if e.error_code == 305:
+                    self.log.exception(
+                        f"T2SA reported error {e.error_code} while measuring target. Ignoring."
+                    )
+                else:
+                    raise
         target_frame_name = self.get_target_name(target)
         reference_frame_name = self.get_target_name("M1M3")
 

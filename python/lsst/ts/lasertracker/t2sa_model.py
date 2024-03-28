@@ -847,7 +847,7 @@ class T2SAModel:
         -------
         ACK300 or ERR code
         """
-        return await self.send_command(f"INC_MEAS_INDEX:{inc}")
+        return await self.send_command(f"!INC_MEAS_INDEX:{inc}")
 
     async def set_measured_index(self, idx: int) -> str:
         """Set the measured point group index.
@@ -862,7 +862,7 @@ class T2SAModel:
         ACK300 or ERR code
         """
 
-        cmd = f"SET_MEAS_INDEX:{idx}"
+        cmd = f"!SET_MEAS_INDEX:{idx}"
         return await self.send_command(cmd)
 
     async def save_settings(self) -> str:

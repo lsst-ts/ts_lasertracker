@@ -43,7 +43,7 @@ OFFSET_MEASURE_REGEX = re.compile(
 )
 
 MEASURE_REGEX = re.compile(
-    r"Meas_(?P<target>.*)_(?P<elevation>.*)_(?P<azimuth>.*)_(?P<rot>.*)::Frame\1_\2_\3_\4"
+    r"Meas_(?P<target>.*)_(?P<elevation>.*)_(?P<azimuth>.*)_(?P<rot>.*)_(?P<index>.*)::Frame\1_\2_\3_\4"
 )
 
 

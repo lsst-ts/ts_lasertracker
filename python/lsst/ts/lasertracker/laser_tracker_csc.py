@@ -176,6 +176,8 @@ class LaserTrackerCsc(salobj.ConfigurableCsc):
             )
             try:
                 await self.model.connect()
+                self.group_idx = 1
+                await self.model.set_measured_index(idx=self.group_idx)
             except Exception:
                 error_message = (
                     "Failed to connect to T2SA. "

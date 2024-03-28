@@ -326,13 +326,13 @@ class LaserTrackerCsc(salobj.ConfigurableCsc):
             f"Meas_{target}_"
             f"{self.elevation:.2f}_"
             f"{self.azimuth:.2f}_"
-            f"{self.camrot:.2f}"
-            f"{self.group_idx}::"
+            f"{self.camrot:.2f}_"
+            f"{self.group_idx:02}::"
             f"Frame{target}_"
             f"{self.elevation:.2f}_"
             f"{self.azimuth:.2f}_"
-            f"{self.camrot:.2f}"
-            f"{self.group_idx}"
+            f"{self.camrot:.2f}_"
+            f"{self.group_idx:02}"
         )
 
     async def do_align(self, data: salobj.BaseDdsDataType) -> None:

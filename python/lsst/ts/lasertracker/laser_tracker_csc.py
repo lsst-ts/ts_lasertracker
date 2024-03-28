@@ -655,12 +655,14 @@ class LaserTrackerCsc(salobj.ConfigurableCsc):
 
         if not isinstance(azimuth_data, Exception):  # type: ignore
             self.azimuth = round(azimuth_data.actualPosition, ndigits=2)  # type: ignore
+            if abs(self.azimuth) <= 1e-2:
+                self.azimuth = 0
         else:
             self.azimuth = self.azimuth_default
 
         if not isinstance(rotator_data, Exception):  # type: ignore
             self.camrot = round(rotator_data.actualPosition, ndigits=2)  # type: ignore
-            if self.camrot <= 1e-2:
+            if abs(self.camrot) <= 1e-2:
                 self.camrot = 0
         else:
             self.camrot = self.camrot_default

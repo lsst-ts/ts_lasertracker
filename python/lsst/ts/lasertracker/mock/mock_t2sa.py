@@ -92,6 +92,7 @@ class MockT2SA(tcpip.OneClientServer):
             "SET_RANDOMIZE_POINTS:1": "ACK300",
             "!RESET_T2SA": "ACK300",
             "!NEW_STATION": "ACK300",
+            "!INC_MEAS_INDEX:1": "ACK-104 Incremented Point Group Index 1 ->",
         }
 
         self.dispatchers: dict[str, tuple[typing.Any, re.Pattern]] = {

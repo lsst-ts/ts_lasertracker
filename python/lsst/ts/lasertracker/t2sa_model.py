@@ -245,7 +245,7 @@ class T2SAModel:
             raise RuntimeError(err_msg)
         except asyncio.TimeoutError:
             err_msg = (
-                f"Timed out while waiting for a reply to command {cmd}; disconnecting"
+                f"Timed out while waiting for a reply to command {cmd}. "
                 f"Read timeout: {self.read_timeout}s. Wait time {time.monotonic()-t0}s."
             )
             self.log.error(err_msg)
@@ -281,9 +281,16 @@ class T2SAModel:
         This function catches that exception and returns "BUSY".
         """
         try:
-            return await self.send_command("?STAT")  # type: ignore
+            result = await self.send_command("?STAT")  # type: ignore
+            if result == "Instrument is connected":
+                return "READY"
+            else:
+                return "BUSY"
         except T2SAError as e:
-            if e.error_code == T2SAErrorCode.CommandRejectedBusy:
+            if e.error_code in {
+                T2SAErrorCode.InstrumentNotReady,
+                T2SAErrorCode.CommandRejectedBusy,
+            }:
                 return "BUSY"
             else:
                 raise
@@ -840,7 +847,7 @@ class T2SAModel:
         -------
         ACK300 or ERR code
         """
-        return await self.send_command(f"INC_MEAS_INDEX:{inc}")
+        return await self.send_command(f"!INC_MEAS_INDEX:{inc}")
 
     async def set_measured_index(self, idx: int) -> str:
         """Set the measured point group index.
@@ -855,7 +862,7 @@ class T2SAModel:
         ACK300 or ERR code
         """
 
-        cmd = f"SET_MEAS_INDEX:{idx}"
+        cmd = f"!SET_MEAS_INDEX:{idx}"
         return await self.send_command(cmd)
 
     async def save_settings(self) -> str:

@@ -6,6 +6,49 @@
 Version History
 ###############
 
+v0.8.0
+------
+
+* In ``laser_tracker_csc``:
+
+  * update target name format to match the latest version of T2SA.
+
+  * reset measurement index to 1 when starting.
+
+  * update measure alignment method to handle situation where one or more measurements failed.
+
+  * fix setting azimuth and camera angles when values are close to zero.
+
+  * update how CSC handle laser status command.
+
+  * move code in handle_summary_state to begin_start to make sure the CSC connects to T2SA before it transitions to DISABLED.
+
+  * update telemetry loop to send CSC to fault if there is an error.
+
+* In ``mock/mock_t2sa``:
+
+  * add canned response to command to increment measurement index.
+
+  * update response from the STAT command.
+
+* In ``t2sa_model``:
+
+  * fix command to increment measurement index and to set measuremement index.
+
+  * update get_status to return BUSY if error is either InstrumentNotReady or CommandRejectedBusy.
+
+  * update how the model handles the response from the STAT command.
+
+  * update error message to remove reference to disconnection for the server when there's an error.
+
+* In ``utils.py``, update MEASURE_REGEX to account for new =separator.
+
+* Add new ErrorCodes enumeration.
+
+* Fix issue with mypy.
+
+* Update .gitignore with latest ts-pre-commit-config setup.
+
 v0.7.1
 ------
 

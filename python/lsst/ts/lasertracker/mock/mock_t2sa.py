@@ -92,6 +92,8 @@ class MockT2SA(tcpip.OneClientServer):
             "SET_RANDOMIZE_POINTS:1": "ACK300",
             "!RESET_T2SA": "ACK300",
             "!NEW_STATION": "ACK300",
+            "!INC_MEAS_INDEX:1": "ACK-104 Incremented Point Group Index 1 ->",
+            "!SET_MEAS_INDEX:1": "ACK300",
         }
 
         self.dispatchers: dict[str, tuple[typing.Any, re.Pattern]] = {
@@ -363,7 +365,7 @@ class MockT2SA(tcpip.OneClientServer):
                 T2SAErrorCode.CommandRejectedBusy, "Command rejected. SA is busy."
             )
         else:
-            await self.write_good_reply(self.t2sa_status)
+            await self.write_good_reply("Instrument is connected")
 
     async def execute_write_point_group_position(self, point_group: str) -> None:
         """Write the position of a point group.

@@ -23,6 +23,8 @@ __all__ = ["LaserTrackerCsc", "run_lasertracker"]
 
 import asyncio
 import pathlib
+import re
+import traceback
 import types
 import typing
 
@@ -31,12 +33,15 @@ from lsst.ts.idl.enums.LaserTracker import LaserStatus, SalIndex, T2SAStatus
 
 from . import __version__
 from .config_schema import CONFIG_SCHEMA
+from .enums import ErrorCodes
 from .mock import MockT2SA
-from .t2sa_model import T2SAModel
+from .t2sa_model import T2SAError, T2SAModel
 from .utils import Target
 
 # The following targets must appear in config.targets
 REQUIRED_TARGETS = {"CAM", "M1M3", "M2"}
+reg_exp_lsta_off = re.compile("(.*)LOFF")
+reg_exp_lsta_on = re.compile("(.*)LON")
 
 
 class LaserTrackerCsc(salobj.ConfigurableCsc):
@@ -137,36 +142,72 @@ class LaserTrackerCsc(salobj.ConfigurableCsc):
             include=["rotation"],
         )
 
+    async def begin_start(self, data: salobj.BaseDdsDataType) -> None:
+        """Execute before changing state from STANDBY to DISABLED.
+
+        Parameters
+        ----------
+        data : `salobj.BaseDdsDataType`
+            Command payload.
+        """
+        await super().begin_start(data)
+
+        t2sa_host = self.config.t2sa_host
+        t2sa_port = self.config.t2sa_port
+
+        if self.simulation_mode == 2 and self._mock_t2sa is None:
+            self.log.debug("Running t2sa mock.")
+            self._mock_t2sa = MockT2SA(log=self.log)
+            await self._mock_t2sa.start_task
+            t2sa_host = self._mock_t2sa.host
+            t2sa_port = self._mock_t2sa.port
+
+        if self.model is None:
+            self.log.info(
+                f"Connecting alignment model to: {t2sa_host}:{t2sa_port}, "
+                f"read_timeout={self.config.read_timeout}s [mode: {self.simulation_mode}]."
+            )
+            self.model = T2SAModel(
+                host=t2sa_host,
+                port=t2sa_port,
+                read_timeout=self.config.read_timeout,
+                t2sa_simulation_mode=self.simulation_mode == 1,
+                log=self.log,
+            )
+            try:
+                await self.model.connect()
+                self.group_idx = 1
+                await self.model.set_measured_index(idx=self.group_idx)
+            except Exception:
+                error_message = (
+                    "Failed to connect to T2SA. "
+                    f"Ensure it is running in {t2sa_host}."
+                )
+
+                self.log.exception(error_message)
+                raise RuntimeError(error_message)
+            self.log.debug(
+                f"Connected to t2sa at {self.model.host}:{self.model.port}. "
+                "Setting telescope position."
+            )
+        elif self.model is not None:
+            if self.model.connected:
+                await self.model.disconnect()
+            await self.model.connect()
+
     async def handle_summary_state(self) -> None:
         """Override parent class method to handle summary state changes."""
         if self.disabled_or_enabled:
-            t2sa_host = self.config.t2sa_host
-            t2sa_port = self.config.t2sa_port
-
-            if self.simulation_mode == 2 and self._mock_t2sa is None:
-                self.log.debug("Running t2sa mock.")
-                self._mock_t2sa = MockT2SA(log=self.log)
-                await self._mock_t2sa.start_task
-                t2sa_host = self._mock_t2sa.host
-                t2sa_port = self._mock_t2sa.port
-
-            if self.model is None:
-                self.log.info(
-                    f"Connecting alignment model to: {t2sa_host}:{t2sa_port}, "
-                    f"read_timeout={self.config.read_timeout}s [mode: {self.simulation_mode}]."
+            if self.model is not None:
+                if not self.model.connected:
+                    await self.model.connect()
+            else:
+                await self.fault(
+                    ErrorCodes.PROGRAMATIC_ERROR,
+                    "Laser tracker interface not defined while is should be. "
+                    "This is most likely a software bug, and should be reported.",
                 )
-                self.model = T2SAModel(
-                    host=t2sa_host,
-                    port=t2sa_port,
-                    read_timeout=self.config.read_timeout,
-                    t2sa_simulation_mode=self.simulation_mode == 1,
-                    log=self.log,
-                )
-                await self.model.connect()
-                self.log.debug(
-                    f"Connected to t2sa at {self.model.host}:{self.model.port}. "
-                    "Setting telescope position."
-                )
+                raise RuntimeError("Laser tracker interface not defined.")
 
             if self.telemetry_loop_task.done():
                 self._run_telemetry_loop = True
@@ -222,10 +263,6 @@ class LaserTrackerCsc(salobj.ConfigurableCsc):
             )
         self.config = instance
         self.log.info(f"Configuration: {self.config}")
-        if self.model is not None:
-            if self.model.connected:
-                await self.model.disconnect()
-            await self.model.connect()
 
     @staticmethod
     def get_config_pkg() -> str:
@@ -289,13 +326,13 @@ class LaserTrackerCsc(salobj.ConfigurableCsc):
             f"Meas_{target}_"
             f"{self.elevation:.2f}_"
             f"{self.azimuth:.2f}_"
-            f"{self.camrot:.2f}"
-            f"{self.group_idx}::"
+            f"{self.camrot:.2f}_"
+            f"{self.group_idx:02}::"
             f"Frame{target}_"
             f"{self.elevation:.2f}_"
             f"{self.azimuth:.2f}_"
-            f"{self.camrot:.2f}"
-            f"{self.group_idx}"
+            f"{self.camrot:.2f}_"
+            f"{self.group_idx:02}"
         )
 
     async def do_align(self, data: salobj.BaseDdsDataType) -> None:
@@ -581,11 +618,31 @@ class LaserTrackerCsc(salobj.ConfigurableCsc):
 
         await self.set_telescope_position()
 
-        await self.model.measure_target("M1M3")
+        try:
+            await self.model.increment_measured_index()
+        finally:
+            self.group_idx += 1
+
+        try:
+            await self.model.measure_target("M1M3")
+        except T2SAError as e:
+            if e.error_code == 305:
+                self.log.exception(
+                    f"T2SA reported error {e.error_code} while measuring target. Ignoring."
+                )
+            else:
+                raise
 
         if target != "M1M3":
-            await self.model.measure_target(target)
-
+            try:
+                await self.model.measure_target(target)
+            except T2SAError as e:
+                if e.error_code == 305:
+                    self.log.exception(
+                        f"T2SA reported error {e.error_code} while measuring target. Ignoring."
+                    )
+                else:
+                    raise
         target_frame_name = self.get_target_name(target)
         reference_frame_name = self.get_target_name("M1M3")
 
@@ -613,27 +670,30 @@ class LaserTrackerCsc(salobj.ConfigurableCsc):
             return_exceptions=True,
         )
 
-        self.elevation = (
-            round(elevation_data.actualPosition, ndigits=2)
-            if not isinstance(elevation_data, Exception)
-            else self.elevation_default
-        )
-        self.azimuth = (
-            round(azimuth_data.actualPosition, ndigits=2)
-            if not isinstance(azimuth_data, Exception)
-            else self.azimuth_default
-        )
-        self.camrot = (
-            round(rotator_data.actualPosition, ndigits=2)
-            if not isinstance(rotator_data, Exception)
-            else self.camrot_default
-        )
+        if not isinstance(elevation_data, Exception):  # type: ignore
+            self.elevation = round(elevation_data.actualPosition, ndigits=2)  # type: ignore
+        else:
+            self.elevation = self.elevation_default
+
+        if not isinstance(azimuth_data, Exception):  # type: ignore
+            self.azimuth = round(azimuth_data.actualPosition, ndigits=2)  # type: ignore
+            if abs(self.azimuth) <= 1e-2:
+                self.azimuth = 0
+        else:
+            self.azimuth = self.azimuth_default
+
+        if not isinstance(rotator_data, Exception):  # type: ignore
+            self.camrot = round(rotator_data.actualPosition, ndigits=2)  # type: ignore
+            if abs(self.camrot) <= 1e-2:
+                self.camrot = 0
+        else:
+            self.camrot = self.camrot_default
 
         if any(
             [
-                isinstance(elevation_data, Exception),
-                isinstance(azimuth_data, Exception),
-                isinstance(rotator_data, Exception),
+                isinstance(elevation_data, Exception),  # type: ignore
+                isinstance(azimuth_data, Exception),  # type: ignore
+                isinstance(rotator_data, Exception),  # type: ignore
             ]
         ):
             self.log.warning(
@@ -656,28 +716,35 @@ class LaserTrackerCsc(salobj.ConfigurableCsc):
         assert self.model is not None
 
         while self._run_telemetry_loop:
-            status = await self.model.get_status()
-            t2sa_status = T2SAStatus(getattr(T2SAStatus, status))
-            if t2sa_status == T2SAStatus.READY:
-                self.laser_status_ready.set()
-            else:
-                self.laser_status_ready.clear()
+            try:
+                status = await self.model.get_status()
+                t2sa_status = T2SAStatus(getattr(T2SAStatus, status))
+                if t2sa_status == T2SAStatus.READY:
+                    self.laser_status_ready.set()
+                else:
+                    self.laser_status_ready.clear()
 
-            await self.evt_t2saStatus.set_write(status=t2sa_status)
+                await self.evt_t2saStatus.set_write(status=t2sa_status)
 
-            status = await self.model.laser_status()
+                status = await self.model.laser_status()
 
-            if status == "LOW":
-                laser_status = LaserStatus.OFF
-            elif status == "LON":
-                laser_status = LaserStatus.ON
-            else:
-                self.log.warning(f"Invalid Laser Status: {status}")
-                laser_status = LaserStatus.NOT_CONNECTED
+                if reg_exp_lsta_off.match(status) is not None:
+                    laser_status = LaserStatus.OFF
+                elif reg_exp_lsta_on.match(status) is not None:
+                    laser_status = LaserStatus.ON
+                else:
+                    self.log.warning(f"Invalid Laser Status: {status}")
+                    laser_status = LaserStatus.NOT_CONNECTED
 
-            await self.evt_laserStatus.set_write(status=laser_status)
+                await self.evt_laserStatus.set_write(status=laser_status)
 
-            await asyncio.sleep(self.heartbeat_interval)
+                await asyncio.sleep(self.heartbeat_interval)
+            except Exception:
+                await self.fault(
+                    code=ErrorCodes.TELEMETRY_LOOP_ERROR,
+                    report="Error in telemetry loop.",
+                    traceback=traceback.format_exc(),
+                )
 
     async def stop_telemetry_loop(self) -> None:
         """Stop the telemetry loop and clean up.

@@ -95,7 +95,7 @@ class MockT2SA(tcpip.OneClientServer):
             "!INC_MEAS_INDEX:1": "ACK-104 Incremented Point Group Index 1 ->",
             "!SET_MEAS_INDEX:1": "ACK300",
             "!APPLY_ALT_AZ_ROT": "ACK300",
-            "!CMD_EXE:CAM_ROT": "ACK300",
+            "!CMD_EXE:CAM_ROT": "ACK-106",
         }
 
         self.dispatchers: dict[str, tuple[typing.Any, re.Pattern]] = {

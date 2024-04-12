@@ -57,7 +57,7 @@ class Target(enum.IntEnum):
 
     M2 = 1
     M1M3 = enum.auto()
-    CAM = enum.auto()
+    CAM_ROT = enum.auto()
     TMA_CENTRAL = enum.auto()
     TMA_UPPER = enum.auto()
 

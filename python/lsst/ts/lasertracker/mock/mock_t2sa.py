@@ -94,7 +94,7 @@ class MockT2SA(tcpip.OneClientServer):
             "!NEW_STATION": "ACK300",
             "!INC_MEAS_INDEX:1": "ACK-104 Incremented Point Group Index 1 ->",
             "!SET_MEAS_INDEX:1": "ACK300",
-            "!APPLY_ALT_AZ_ROT": "ACK300",
+            "!APPLY_ALT_AZ_ROT:CAM": "ACK300",
             "!CMD_EXE:CAM_ROT": "ACK-106",
         }
 
@@ -118,11 +118,6 @@ class MockT2SA(tcpip.OneClientServer):
                 ),
                 (
                     "!PUBLISH_ALT_AZ_ROT",
-                    self.execute_set_alt_az_rot,
-                    r"(?P<alt>.*);(?P<az>.*);(?P<rot>.*)",
-                ),
-                (
-                    "!APPLY_ALT_AZ_ROT",
                     self.execute_set_alt_az_rot,
                     r"(?P<alt>.*);(?P<az>.*);(?P<rot>.*)",
                 ),

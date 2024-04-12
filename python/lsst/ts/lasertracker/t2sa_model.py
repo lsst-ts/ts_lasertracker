@@ -802,7 +802,7 @@ class T2SAModel:
         ACK-106 or ERR code
         """
         await self.send_command(f"!PUBLISH_ALT_AZ_ROT:{telalt};{telaz};{camrot}")
-        await self.send_command(f"!APPLY_ALT_AZ_ROT:{telalt};{telaz};{camrot}")
+        await self.send_command(f"!APPLY_ALT_AZ_ROT:CAM")
 
         return await self.send_command(f"!CMDEXE:CAM_ROT")
 

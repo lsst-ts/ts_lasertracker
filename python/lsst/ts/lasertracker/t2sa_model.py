@@ -801,10 +801,10 @@ class T2SAModel:
         -------
         ACK-106 or ERR code
         """
-        await self.send_command(f"!PUBLISH_ALT_AZ_ROT:{telalt};{telaz};{camrot}")
-        await self.send_command(f"!APPLY_ALT_AZ_ROT:CAM")
+        await self.send_command(f"!PUBLISH_ALT_AZ_ROT:0.0;0.0;{camrot}")
+        await self.send_command("!APPLY_ALT_AZ_ROT:CAM")
 
-        return await self.send_command(f"!CMDEXE:CAM_ROT")
+        return await self.send_command(f"!PUBLISH_ALT_AZ_ROT:{telalt};{telaz};{camrot}")
 
     async def set_num_samples(self, numsamples: int) -> str:
         """Set the number of tracker samples per point.

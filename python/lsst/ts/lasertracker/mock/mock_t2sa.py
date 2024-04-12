@@ -121,6 +121,11 @@ class MockT2SA(tcpip.OneClientServer):
                     self.execute_set_alt_az_rot,
                     r"(?P<alt>.*);(?P<az>.*);(?P<rot>.*)",
                 ),
+                (
+                    "!APPLY_ALT_AZ_ROT",
+                    self.execute_set_alt_az_rot,
+                    r"(?P<alt>.*);(?P<az>.*);(?P<rot>.*)",
+                ),
                 ("!SAVE_SA_JOBFILE", self.execute_save_sa_jobfile, r"(?P<filename>.*)"),
                 (
                     "!SET_REFERENCE_GROUP",

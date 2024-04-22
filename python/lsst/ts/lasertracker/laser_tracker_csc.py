@@ -664,7 +664,6 @@ class LaserTrackerCsc(salobj.ConfigurableCsc):
 
         # Set Measured M1M3 Frame as the reference frame
         working_frame_name = self.get_target_name("M1M3")
-        await self.model.set_working_frame(working_frame_name)
 
         # Get frame of the measured target and of the default optimal target frame.
         target_frame_name = self.get_target_name(target)

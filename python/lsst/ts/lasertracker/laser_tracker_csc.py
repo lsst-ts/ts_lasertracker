@@ -334,6 +334,24 @@ class LaserTrackerCsc(salobj.ConfigurableCsc):
             f"{self.camrot:.2f}_"
             f"{self.group_idx:02}"
         )
+    
+    def get_default_target_name(self, target: str) -> str:
+        """Return target frame name from target name.
+
+        Parameters
+        ----------
+        target : `str`
+            Target name.
+
+        Returns
+        -------
+        target_name : `str`
+            Target frame name.
+        """
+        return (
+            f"A::"
+            f"Frame{target}"
+        )
 
     async def do_align(self, data: salobj.BaseDdsDataType) -> None:
         """Measure alignment.
@@ -643,9 +661,18 @@ class LaserTrackerCsc(salobj.ConfigurableCsc):
                     )
                 else:
                     raise
-        target_frame_name = self.get_target_name(target)
-        reference_frame_name = self.get_target_name("M1M3")
 
+        # Set Measured M1M3 Frame as the reference frame
+        working_frame_name = self.get_target_name("M1M3")
+        await self.model.set_working_frame(working_frame_name)
+
+        # Get frame of the measured target and of the default optimal target frame.
+        target_frame_name = self.get_target_name(target)
+        reference_frame_name = self.get_default_target_name(target)
+
+        # Compute offset between measured target frame 
+        # and the default optimal target frame. Both of them are expressed
+        # in the reference frame of M1M3 since that was set as working frame.
         target_offset = await self.model.get_target_offset(
             target=target_frame_name, reference_pointgroup=reference_frame_name
         )

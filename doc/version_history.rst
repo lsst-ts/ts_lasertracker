@@ -6,6 +6,18 @@
 Version History
 ###############
 
+v0.8.1
+------
+
+* In ``t2sa_model``:
+
+  * update set_position_telescope to handle camera rotation.
+
+* In ``mock_t2sa``:
+
+  * add mock response to commands to set the telescope position.
+
+
 v0.8.0
 ------
 

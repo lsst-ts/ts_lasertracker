@@ -6,6 +6,11 @@
 Version History
 ###############
 
+v.0.8.1
+-------
+
+* Add zeropoint position to ``laser_tracker_csc`` and `config_schema`` to account for optimal alignment of M2 and CAM.
+
 v0.8.0
 ------
 

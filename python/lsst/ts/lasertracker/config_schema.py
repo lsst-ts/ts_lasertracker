@@ -52,6 +52,20 @@ properties:
         read_timeout:
           description: Timeout for reading T2SA replies to commands (seconds).
           type: number
+        m2_zeropoint:
+          description: zeropoint array for M2 [x, y, z, rx, ry].
+          type: array
+          items:
+            type: number
+          minItems: 5
+          maxItems: 5
+        cam_zeropoint:
+          description: zeropoint array for CAM [x, y, z, rx, ry].
+          type: array
+          items:
+            type: number
+          minItems: 5
+          maxItems: 5
         targets:
           description: >-
             Names of valid targets.

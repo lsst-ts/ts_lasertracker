@@ -3,6 +3,18 @@ instances:
   t2sa_host: "127.0.0.1"
   t2sa_port: 50000
   read_timeout: 30
+  m2_zeropoint: 
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+  cam_zeropoint:
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
   targets:
     - CAM
     - M1M3

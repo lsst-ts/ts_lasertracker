@@ -6,6 +6,11 @@
 Version History
 ###############
 
+v0.9.0
+-------
+
+* Add zeropoint position to ``laser_tracker_csc`` and `config_schema`` to account for optimal alignment of M2 and CAM.
+
 v0.8.1
 ------
 
@@ -16,7 +21,6 @@ v0.8.1
 * In ``mock_t2sa``:
 
   * add mock response to commands to set the telescope position.
-
 
 v0.8.0
 ------

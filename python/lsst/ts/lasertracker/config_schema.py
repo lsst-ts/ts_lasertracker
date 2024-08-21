@@ -28,7 +28,7 @@ CONFIG_SCHEMA = yaml.safe_load(
 $schema: http://json-schema.org/draft-07/schema#
 $id: https://github.com/lsst-ts/ts_lasertracker/blob/master/schema/alignment.yaml
 # title must end with one or more spaces followed by the schema version, which must begin with "v"
-title: LaserTracker v1
+title: LaserTracker v2
 description: Schema for LaserTracker CSC configuration files
 type: object
 properties:
@@ -52,6 +52,48 @@ properties:
         read_timeout:
           description: Timeout for reading T2SA replies to commands (seconds).
           type: number
+        zero_points:
+          description: Zero points for components positions
+          type: object
+          properties:
+            m2:
+              description: Zero point for M2.
+              type: object
+              properties:
+                x:
+                  description: Zero point in x in mm.
+                  type: number
+                y:
+                  description: Zero point in y in mm.
+                  type: number
+                z:
+                  description: Zero point in z in mm.
+                  type: number
+                u:
+                  description: Zero point for rotations around x axis in degrees.
+                  type: number
+                v:
+                  description: Zero point for rotations around y axis in degrees.
+                  type: number
+            camera:
+              description: Zero point for M2.
+              type: object
+              properties:
+                x:
+                  description: Zero point in x in mm.
+                  type: number
+                y:
+                  description: Zero point in y in mm.
+                  type: number
+                z:
+                  description: Zero point in z in mm.
+                  type: number
+                u:
+                  description: Zero point for rotations around x axis in degrees.
+                  type: number
+                v:
+                  description: Zero point for rotations around y axis in degrees.
+                  type: number
         targets:
           description: >-
             Names of valid targets.

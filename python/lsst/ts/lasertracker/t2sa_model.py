@@ -799,8 +799,11 @@ class T2SAModel:
 
         Returns
         -------
-        ACK300 or ERR code
+        ACK-106 or ERR code
         """
+        await self.send_command(f"!PUBLISH_ALT_AZ_ROT:0.0;0.0;{camrot}")
+        await self.send_command("!APPLY_ALT_AZ_ROT:CAM")
+
         return await self.send_command(f"!PUBLISH_ALT_AZ_ROT:{telalt};{telaz};{camrot}")
 
     async def set_num_samples(self, numsamples: int) -> str:

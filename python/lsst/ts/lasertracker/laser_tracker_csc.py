@@ -650,6 +650,20 @@ class LaserTrackerCsc(salobj.ConfigurableCsc):
             target=target_frame_name, reference_pointgroup=reference_frame_name
         )
 
+        # Remove Zeropoint from offset
+        if target == "M2":
+            target_offset["dX"] -= self.config.zero_points["m2"]["x"]
+            target_offset["dY"] -= self.config.zero_points["m2"]["y"]
+            target_offset["dZ"] -= self.config.zero_points["m2"]["z"]
+            target_offset["dRX"] -= self.config.zero_points["m2"]["u"]
+            target_offset["dRY"] -= self.config.zero_points["m2"]["v"]
+        elif target == "CAM":
+            target_offset["dX"] -= self.config.zero_points["camera"]["x"]
+            target_offset["dY"] -= self.config.zero_points["camera"]["y"]
+            target_offset["dZ"] -= self.config.zero_points["camera"]["z"]
+            target_offset["dRX"] -= self.config.zero_points["camera"]["u"]
+            target_offset["dRY"] -= self.config.zero_points["camera"]["v"]
+
         target_offset["force_output"] = True
         await self.evt_offsetsPublish.set_write(**target_offset)
 

@@ -6,6 +6,11 @@
 Version History
 ###############
 
+v0.9.2
+------
+
+* Fix issue with indexing measurements in T2SA.
+
 v0.9.1
 ------
 

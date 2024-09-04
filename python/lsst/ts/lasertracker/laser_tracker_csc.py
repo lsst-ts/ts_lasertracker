@@ -618,12 +618,10 @@ class LaserTrackerCsc(salobj.ConfigurableCsc):
 
         await self.set_telescope_position()
 
-        try:
-            await self.model.increment_measured_index()
-        finally:
-            self.group_idx += 1
+        self.group_idx += 1
 
         try:
+            await self.model.set_measured_index(self.group_idx)
             await self.model.measure_target("M1M3")
         except T2SAError as e:
             if e.error_code == 305:
@@ -635,6 +633,7 @@ class LaserTrackerCsc(salobj.ConfigurableCsc):
 
         if target != "M1M3":
             try:
+                await self.model.set_measured_index(self.group_idx)
                 await self.model.measure_target(target)
             except T2SAError as e:
                 if e.error_code == 305:
@@ -645,6 +644,8 @@ class LaserTrackerCsc(salobj.ConfigurableCsc):
                     raise
         target_frame_name = self.get_target_name(target)
         reference_frame_name = self.get_target_name("M1M3")
+
+        self.log.info(f"{target_frame_name=}, {reference_frame_name=}.")
 
         target_offset = await self.model.get_target_offset(
             target=target_frame_name, reference_pointgroup=reference_frame_name

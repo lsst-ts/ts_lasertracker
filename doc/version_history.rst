@@ -6,6 +6,11 @@
 Version History
 ###############
 
+v0.9.3
+------
+
+* In ``laser_tracker_csc`` fix setting elevation angle when value is close to zero.
+
 v0.9.2
 ------
 

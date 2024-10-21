@@ -687,6 +687,8 @@ class LaserTrackerCsc(salobj.ConfigurableCsc):
 
         if not isinstance(elevation_data, Exception):  # type: ignore
             self.elevation = round(elevation_data.actualPosition, ndigits=2)  # type: ignore
+            if abs(self.elevation) <= 1e-2:
+                self.elevation = 0
         else:
             self.elevation = self.elevation_default
 

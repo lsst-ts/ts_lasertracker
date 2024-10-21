@@ -92,8 +92,6 @@ class MockT2SA(tcpip.OneClientServer):
             "SET_RANDOMIZE_POINTS:1": "ACK300",
             "!RESET_T2SA": "ACK300",
             "!NEW_STATION": "ACK300",
-            "!INC_MEAS_INDEX:1": "ACK-104 Incremented Point Group Index 1 ->",
-            "!SET_MEAS_INDEX:1": "ACK300",
             "!APPLY_ALT_AZ_ROT:CAM": "ACK300",
             "!CMD_EXE:CAM_ROT": "ACK-106",
         }
@@ -150,6 +148,8 @@ class MockT2SA(tcpip.OneClientServer):
                     r"(?P<point_group>.*)",
                 ),
                 ("?STAT", self.execute_write_status, ""),
+                ("!SET_MEAS_INDEX", self.set_mean_index, r"(?P<index>[0-9]*)"),
+                ("!INC_MEAS_INDEX", self.inc_meas_index, r"(?P<increment>[0-9]*)"),
             )
         }
 
@@ -183,6 +183,8 @@ class MockT2SA(tcpip.OneClientServer):
         self._telescope_position = TelescopePosition()
 
         self._commands_reply_tasks: list[asyncio.Task] = []
+
+        self.measurement_index = 0
 
         super().__init__(
             name="MockT2SA",
@@ -368,6 +370,37 @@ class MockT2SA(tcpip.OneClientServer):
             )
         else:
             await self.write_good_reply("Instrument is connected")
+
+    async def set_mean_index(self, index: str) -> None:
+        """Set measurement index.
+
+        Parameters
+        ----------
+        index : `str`
+            New measurement index as a string, will be converted to an int.
+        """
+        self.log.debug(
+            f"Setting measurement index {self.measurement_index} -> {index}."
+        )
+        self.measurement_index = int(index)
+
+        await self._write_reply(
+            f"ACK-111 Set Point Group Index  ->  Set Group Idx to {self.measurement_index}."
+        )
+
+    async def inc_meas_index(self, increment: str) -> None:
+        """Increment the  measument index.
+
+        Parameters
+        ----------
+        increment : `str`
+            How much to increment measument index as a string,
+            will be converted to an int.
+        """
+        self.measurement_index += int(increment)
+        await self._write_reply(
+            f"ACK-104 Incremented Point Group Index  ->  Incremented group index by {increment}"
+        )
 
     async def execute_write_point_group_position(self, point_group: str) -> None:
         """Write the position of a point group.

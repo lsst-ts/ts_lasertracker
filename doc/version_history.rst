@@ -6,6 +6,11 @@
 Version History
 ###############
 
+v0.9.2
+------
+
+* In ``laser_tracker_csc`` fix rotator angle to be between 0 and 360 degrees.
+
 v0.9.3
 ------
 

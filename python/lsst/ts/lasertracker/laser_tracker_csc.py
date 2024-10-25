@@ -28,8 +28,10 @@ import traceback
 import types
 import typing
 
+import astropy.units as u
 from lsst.ts import salobj, utils
 from lsst.ts.idl.enums.LaserTracker import LaserStatus, SalIndex, T2SAStatus
+from lsst.ts.utils import angle_wrap_nonnegative
 
 from . import __version__
 from .config_schema import CONFIG_SCHEMA
@@ -700,9 +702,9 @@ class LaserTrackerCsc(salobj.ConfigurableCsc):
             self.azimuth = self.azimuth_default
 
         if not isinstance(rotator_data, Exception):  # type: ignore
-            self.camrot = round(rotator_data.actualPosition, ndigits=2)  # type: ignore
-            if abs(self.camrot) <= 1e-2:
-                self.camrot = 0
+            self.camrot = angle_wrap_nonnegative(
+                round(rotator_data.actualPosition, ndigits=2) * u.deg  # type: ignore
+            ).value
         else:
             self.camrot = self.camrot_default
 

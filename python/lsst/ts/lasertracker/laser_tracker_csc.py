@@ -309,6 +309,21 @@ class LaserTrackerCsc(salobj.ConfigurableCsc):
 
         await self.evt_positionPublish.set_write(**last_measurement)
 
+    def get_reference_target_name(self, target: str) -> str:
+        """Return target reference frame name from target name.
+
+        Parameters
+        ----------
+        target : `str`
+            Target name.
+
+        Returns
+        -------
+        target_name : `str`
+            Target frame name.
+        """
+        return "A::" f"Frame{target}"
+
     def get_target_name(self, target: str) -> str:
         """Return target frame name from target name.
 
@@ -643,27 +658,13 @@ class LaserTrackerCsc(salobj.ConfigurableCsc):
                 else:
                     raise
         target_frame_name = self.get_target_name(target)
-        reference_frame_name = self.get_target_name("M1M3")
+        reference_frame_name = self.get_reference_target_name(target)
 
         self.log.info(f"{target_frame_name=}, {reference_frame_name=}.")
 
         target_offset = await self.model.get_target_offset(
             target=target_frame_name, reference_pointgroup=reference_frame_name
         )
-
-        # Remove Zeropoint from offset
-        if target == "M2":
-            target_offset["dX"] -= self.config.zero_points["m2"]["x"]
-            target_offset["dY"] -= self.config.zero_points["m2"]["y"]
-            target_offset["dZ"] -= self.config.zero_points["m2"]["z"]
-            target_offset["dRX"] -= self.config.zero_points["m2"]["u"]
-            target_offset["dRY"] -= self.config.zero_points["m2"]["v"]
-        elif target == "CAM":
-            target_offset["dX"] -= self.config.zero_points["camera"]["x"]
-            target_offset["dY"] -= self.config.zero_points["camera"]["y"]
-            target_offset["dZ"] -= self.config.zero_points["camera"]["z"]
-            target_offset["dRX"] -= self.config.zero_points["camera"]["u"]
-            target_offset["dRY"] -= self.config.zero_points["camera"]["v"]
 
         target_offset["force_output"] = True
         await self.evt_offsetsPublish.set_write(**target_offset)

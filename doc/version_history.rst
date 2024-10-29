@@ -6,6 +6,11 @@
 Version History
 ###############
 
+v0.9.4
+------
+
+* Measure offsets relative to reference targets which are in M1M3 coordinate system.
+
 v0.9.3
 ------
 

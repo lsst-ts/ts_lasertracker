@@ -309,6 +309,21 @@ class LaserTrackerCsc(salobj.ConfigurableCsc):
 
         await self.evt_positionPublish.set_write(**last_measurement)
 
+    def get_reference_target_name(self, target: str) -> str:
+        """Return target reference frame name from target name.
+
+        Parameters
+        ----------
+        target : `str`
+            Target name.
+
+        Returns
+        -------
+        target_name : `str`
+            Target frame name.
+        """
+        return f"A::Frame{target}"
+
     def get_target_name(self, target: str) -> str:
         """Return target frame name from target name.
 
@@ -643,7 +658,7 @@ class LaserTrackerCsc(salobj.ConfigurableCsc):
                 else:
                     raise
         target_frame_name = self.get_target_name(target)
-        reference_frame_name = self.get_target_name("M1M3")
+        reference_frame_name = self.get_reference_target_name(target)
 
         self.log.info(f"{target_frame_name=}, {reference_frame_name=}.")
 

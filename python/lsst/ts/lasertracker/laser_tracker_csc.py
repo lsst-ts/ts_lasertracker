@@ -322,7 +322,7 @@ class LaserTrackerCsc(salobj.ConfigurableCsc):
         target_name : `str`
             Target frame name.
         """
-        return "A::" f"Frame{target}"
+        return f"A::Frame{target}"
 
     def get_target_name(self, target: str) -> str:
         """Return target frame name from target name.

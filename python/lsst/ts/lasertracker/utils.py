@@ -60,6 +60,7 @@ class Target(enum.IntEnum):
     CAM_ROT = enum.auto()
     TMA_CENTRAL = enum.auto()
     TMA_UPPER = enum.auto()
+    CALIBRATION_SCREEN = enum.auto()
 
 
 @dataclass

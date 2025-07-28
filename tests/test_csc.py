@@ -27,8 +27,10 @@ import unittest
 
 import numpy as np
 import pytest
-from lsst.ts import lasertracker, salobj
-from lsst.ts.idl.enums.LaserTracker import SalIndex
+from lsst.ts import lasertracker
+from lsst.ts import salobj
+from lsst.ts.xml import sal_enums
+from lsst.ts.xml.enums.LaserTracker import SalIndex
 
 STD_TIMEOUT = 15  # standard command timeout (sec)
 TEST_CONFIG_DIR = pathlib.Path(__file__).parent.joinpath("data", "config")
@@ -39,7 +41,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         self,
         index: SalIndex | int,
         config_dir: typing.Union[str, pathlib.Path, None],
-        initial_state: typing.Union[salobj.State, int],
+        initial_state: typing.Union[sal_enums.State, int],
         override: str = "",
         simulation_mode: int = 2,
     ) -> lasertracker.LaserTrackerCsc:

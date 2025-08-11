@@ -7,15 +7,15 @@ source:
   path: ../
 
 build:
-  noarch: generic
+  noarch: python
   script: {{ PYTHON }} -m pip install --no-deps --ignore-installed .
   entry_points:
     - run_lasertracker = lsst.ts.lasertracker:run_lasertracker
 
 test:
   requires:
-    - ts-conda-build =0.4
-    - ts-idl {{ idl_version }}
+    - ts-conda-build =0.5
+    - ts-xml {{ xml_version }}
     - ts-salobj {{ salobj_version }}
   source_files:
     - python
@@ -29,18 +29,13 @@ requirements:
   host:
     - python {{ python }}
     - pip
-    - setuptools_scm
-    - setuptools
-  build:
-    - python {{ python }}
-    - setuptools_scm
-    - setuptools
-    - ts-conda-build =0.4
+    - setuptools_scm ={{setuptools_scm}}
+    - setuptools >={{setuptools}}
   run:
     - python {{ python }}
     - setuptools
     - setuptools_scm
     - ts-salobj
-    - ts-idl
+    - ts-xml
     - ts-tcpip
     - scipy

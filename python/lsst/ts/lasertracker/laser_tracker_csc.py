@@ -28,8 +28,10 @@ import traceback
 import types
 import typing
 
-from lsst.ts import salobj, utils
-from lsst.ts.idl.enums.LaserTracker import LaserStatus, SalIndex, T2SAStatus
+from lsst.ts import salobj
+from lsst.ts import utils
+from lsst.ts.xml.enums.LaserTracker import LaserStatus, SalIndex, T2SAStatus
+from lsst.ts.xml import sal_enums
 
 from . import __version__
 from .config_schema import CONFIG_SCHEMA
@@ -90,7 +92,7 @@ class LaserTrackerCsc(salobj.ConfigurableCsc):
         self,
         index: SalIndex | int,
         config_dir: str | pathlib.Path | None = None,
-        initial_state: salobj.State = salobj.State.STANDBY,
+        initial_state: sal_enums.State = sal_enums.State.STANDBY,
         override: str = "",
         simulation_mode: int = 0,
     ) -> None:

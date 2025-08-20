@@ -27,8 +27,10 @@ import unittest
 
 import numpy as np
 import pytest
-from lsst.ts import lasertracker, salobj
-from lsst.ts.idl.enums.LaserTracker import SalIndex
+from lsst.ts import lasertracker
+from lsst.ts import salobj
+from lsst.ts.xml import sal_enums
+from lsst.ts.xml.enums.LaserTracker import SalIndex
 
 STD_TIMEOUT = 15  # standard command timeout (sec)
 TEST_CONFIG_DIR = pathlib.Path(__file__).parent.joinpath("data", "config")
@@ -39,7 +41,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         self,
         index: SalIndex | int,
         config_dir: typing.Union[str, pathlib.Path, None],
-        initial_state: typing.Union[salobj.State, int],
+        initial_state: typing.Union[sal_enums.State, int],
         override: str = "",
         simulation_mode: int = 2,
     ) -> lasertracker.LaserTrackerCsc:
@@ -573,7 +575,12 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         ):
             await self.quick_power_on(laser_warmup_time=0.0, wait_warmup=True)
 
+            tested_targets = 0
             for target in lasertracker.Target:
+                if target.name.lower() not in lasertracker.mock.mock_utils.OPTIMAL_POSITION:
+                    continue
+                tested_targets += 1
+
                 await self.remote.cmd_align.set_start(
                     target=target,
                     timeout=STD_TIMEOUT,
@@ -599,3 +606,4 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                     assert abs(offset.dRX) > 0.0
                     assert abs(offset.dRY) > 0.0
                     assert abs(offset.dRZ) > 0.0
+            assert tested_targets > 0

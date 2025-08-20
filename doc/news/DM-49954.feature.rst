@@ -1,1 +1,0 @@
-Added calibration screen to the list of targets.

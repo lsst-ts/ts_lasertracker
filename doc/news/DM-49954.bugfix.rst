@@ -1,1 +1,0 @@
-Fixed target name. Instead of using CAM use CAM_ROT.

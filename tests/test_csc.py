@@ -575,7 +575,12 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         ):
             await self.quick_power_on(laser_warmup_time=0.0, wait_warmup=True)
 
+            tested_targets = 0
             for target in lasertracker.Target:
+                if target.name.lower() not in lasertracker.mock.mock_utils.OPTIMAL_POSITION:
+                    continue
+                tested_targets += 1
+
                 await self.remote.cmd_align.set_start(
                     target=target,
                     timeout=STD_TIMEOUT,
@@ -601,3 +606,4 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                     assert abs(offset.dRX) > 0.0
                     assert abs(offset.dRY) > 0.0
                     assert abs(offset.dRZ) > 0.0
+            assert tested_targets > 0

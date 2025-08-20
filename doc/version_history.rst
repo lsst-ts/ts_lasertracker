@@ -8,6 +8,28 @@ Version History
 
 .. towncrier release notes start
 
+v0.9.4 (2025-08-20)
+===================
+
+New Features
+------------
+
+- Added calibration screen to the list of targets. (`DM-49954 <https://rubinobs.atlassian.net//browse/DM-49954>`_)
+
+
+Bug Fixes
+---------
+
+- Fixed target name. Instead of using CAM use CAM_ROT. (`DM-49954 <https://rubinobs.atlassian.net//browse/DM-49954>`_)
+- Fixed version field generation. (`OSW-724 <https://rubinobs.atlassian.net//browse/OSW-724>`_)
+
+
+Other Changes and Additions
+---------------------------
+
+- Added towncrier support. (`OSW-724 <https://rubinobs.atlassian.net//browse/OSW-724>`_)
+
+
 v0.9.3
 ------
 

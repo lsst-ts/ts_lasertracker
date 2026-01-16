@@ -21,14 +21,14 @@
 
 import numpy as np
 import pytest
+
 from lsst.ts.lasertracker import utils
 
 
 def test_parse_single_point_measure() -> None:
     for x, y, z in np.round(np.random.rand(3, 3), 6):
         single_point_measure_sample = (
-            "Single Point Measurement M1M3_1 result "
-            f"{x},{y},{z} 08/19/2022 14:45:43 True"
+            f"Single Point Measurement M1M3_1 result {x},{y},{z} 08/19/2022 14:45:43 True"
         )
 
         data = utils.parse_single_point_measurement(single_point_measure_sample)

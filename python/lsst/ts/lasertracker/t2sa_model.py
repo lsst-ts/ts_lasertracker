@@ -122,10 +122,7 @@ class T2SAModel:
     def connected(self) -> bool:
         """Return True if connected."""
         return not (
-            self.reader is None
-            or self.writer is None
-            or self.reader.at_eof()
-            or self.writer.is_closing()
+            self.reader is None or self.writer is None or self.reader.at_eof() or self.writer.is_closing()
         )
 
     async def disconnect(self) -> None:
@@ -233,8 +230,7 @@ class T2SAModel:
             dt = time.monotonic() - t0
             if dt > LOG_WARNING_TIMEOUT:
                 self.log.warning(
-                    f"Took {dt:0.2f} seconds to read {reply_bytes!r} "
-                    f"in response to command {cmd}"
+                    f"Took {dt:0.2f} seconds to read {reply_bytes!r} in response to command {cmd}"
                 )
             else:
                 self.log.debug(f"Received reply: {reply_bytes!r}")
@@ -246,7 +242,7 @@ class T2SAModel:
         except asyncio.TimeoutError:
             err_msg = (
                 f"Timed out while waiting for a reply to command {cmd}. "
-                f"Read timeout: {self.read_timeout}s. Wait time {time.monotonic()-t0}s."
+                f"Read timeout: {self.read_timeout}s. Wait time {time.monotonic() - t0}s."
             )
             self.log.error(err_msg)
             raise RuntimeError(err_msg)
@@ -403,9 +399,7 @@ class T2SAModel:
 
         return parse_offsets(target_position_response)
 
-    async def get_point_position(
-        self, pointgroup: str, point: str, collection: str = "A"
-    ) -> str:
+    async def get_point_position(self, pointgroup: str, point: str, collection: str = "A") -> str:
         """Get the position of a previously measured point.
 
         Parameters
@@ -450,9 +444,7 @@ class T2SAModel:
         if reference_pointgroup is None:
             reference_pointgroup = target
 
-        target_offset_response = await self.send_command(
-            f"?OFFSET:{target};{reference_pointgroup}"
-        )
+        target_offset_response = await self.send_command(f"?OFFSET:{target};{reference_pointgroup}")
 
         return parse_offsets(target_offset_response)
 
@@ -618,9 +610,7 @@ class T2SAModel:
         """
         return await self.send_command(f"!GEN_REPORT:{reportname}")
 
-    async def set_twoface_tolerances(
-        self, az_tol: float, el_tol: float, range_tol: float
-    ) -> str:
+    async def set_twoface_tolerances(self, az_tol: float, el_tol: float, range_tol: float) -> str:
         """Set maximum allowed divergences when measuring the same point using
         the tracker's two different "facings".
 
@@ -780,9 +770,7 @@ class T2SAModel:
         async with self.comm_lock:
             return await self._wait_reply(cmd="!HALT")
 
-    async def set_telescope_position(
-        self, telalt: float, telaz: float, camrot: float
-    ) -> str:
+    async def set_telescope_position(self, telalt: float, telaz: float, camrot: float) -> str:
         """Tell the T2SA the telescope's current position and camera
         rotation angle.
 

@@ -17,6 +17,7 @@ test:
     - ts-conda-build =0.5
     - ts-xml {{ xml_version }}
     - ts-salobj {{ salobj_version }}
+    - ts-mthexapod
   source_files:
     - python
     - tests
@@ -38,4 +39,5 @@ requirements:
     - ts-salobj
     - ts-xml
     - ts-tcpip
+    - ts-mthexapod
     - scipy

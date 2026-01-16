@@ -158,8 +158,7 @@ class MockT2SA(tcpip.OneClientServer):
         duplicate_keys = self.dispatchers.keys() & self.canned_replies.keys()
         if duplicate_keys:
             raise RuntimeError(
-                f"Bug: keys {duplicate_keys} appear in both "
-                "canned_replies and command_handlers"
+                f"Bug: keys {duplicate_keys} appear in both canned_replies and command_handlers"
             )
 
         self._laser_warmup_start_tai: None | float = None
@@ -245,9 +244,7 @@ class MockT2SA(tcpip.OneClientServer):
         except Exception:
             self.log.exception("Error execution action.")
         else:
-            await self._write_reply(
-                f"ACK-106 Successfully ran drift scan for {point_group}"
-            )
+            await self._write_reply(f"ACK-106 Successfully ran drift scan for {point_group}")
 
     async def execute_two_face_check(self, point_group: str) -> None:
         """Simulate a two face check.
@@ -262,9 +259,7 @@ class MockT2SA(tcpip.OneClientServer):
         except Exception:
             self.log.exception("Error execution action.")
         else:
-            await self._write_reply(
-                f"ACK-106 Successfully ran two face check for {point_group}"
-            )
+            await self._write_reply(f"ACK-106 Successfully ran two face check for {point_group}")
 
     async def execute_measure_plan(self, point_group: str) -> None:
         """Simulate a measurement plan.
@@ -282,9 +277,7 @@ class MockT2SA(tcpip.OneClientServer):
         except Exception:
             self.log.exception("Error execution action.")
         else:
-            self.log.debug(
-                f"Measurement plan for {point_group=} completed successfully."
-            )
+            self.log.debug(f"Measurement plan for {point_group=} completed successfully.")
             await self._write_reply(f"ACK-106 Successfully ran CMD {point_group}")
 
     async def execute_halt(self) -> None:
@@ -365,9 +358,7 @@ class MockT2SA(tcpip.OneClientServer):
         """Write current status."""
 
         if self.t2sa_status == BUSY_STATUS:
-            await self.write_error_reply(
-                T2SAErrorCode.CommandRejectedBusy, "Command rejected. SA is busy."
-            )
+            await self.write_error_reply(T2SAErrorCode.CommandRejectedBusy, "Command rejected. SA is busy.")
         else:
             await self.write_good_reply("Instrument is connected")
 
@@ -379,9 +370,7 @@ class MockT2SA(tcpip.OneClientServer):
         index : `str`
             New measurement index as a string, will be converted to an int.
         """
-        self.log.debug(
-            f"Setting measurement index {self.measurement_index} -> {index}."
-        )
+        self.log.debug(f"Setting measurement index {self.measurement_index} -> {index}.")
         self.measurement_index = int(index)
 
         await self._write_reply(
@@ -442,13 +431,9 @@ class MockT2SA(tcpip.OneClientServer):
         """
 
         if self.is_measuring():
-            await self.write_error_reply(
-                T2SAErrorCode.CommandRejected, "Command rejected. SA is busy."
-            )
+            await self.write_error_reply(T2SAErrorCode.CommandRejected, "Command rejected. SA is busy.")
         elif self.measure_task.cancelled():
-            await self.write_error_reply(
-                T2SAErrorCode.FailedPointGroupMeasurement, "Measurement failed."
-            )
+            await self.write_error_reply(T2SAErrorCode.FailedPointGroupMeasurement, "Measurement failed.")
         else:
             point_group_name = point_group.lower()
             if point_group_name not in self.position_current:
@@ -459,9 +444,7 @@ class MockT2SA(tcpip.OneClientServer):
             else:
                 await self._write_position(body_name=point_group_name)
 
-    async def execute_write_point_group_offset(
-        self, reference_group: str, point_group: str
-    ) -> None:
+    async def execute_write_point_group_offset(self, reference_group: str, point_group: str) -> None:
         """Write a point group offset.
 
         Parameters
@@ -475,8 +458,7 @@ class MockT2SA(tcpip.OneClientServer):
         point_group_match = MEASURE_REGEX.match(point_group)
         if (
             reference_group_match is None
-            or reference_group_match.groupdict()["target"].lower()
-            not in self.position_optimum
+            or reference_group_match.groupdict()["target"].lower() not in self.position_optimum
         ):
             await self.write_error_reply(
                 T2SAErrorCode.DidFindOrSetPointGroupAndTargetName,
@@ -484,8 +466,7 @@ class MockT2SA(tcpip.OneClientServer):
             )
         elif (
             point_group_match is None
-            or point_group_match.groupdict()["target"].lower()
-            not in self.position_current
+            or point_group_match.groupdict()["target"].lower() not in self.position_current
         ):
             await self.write_error_reply(
                 T2SAErrorCode.DidFindOrSetPointGroupAndTargetName,
@@ -540,38 +521,26 @@ class MockT2SA(tcpip.OneClientServer):
             )
             return
 
-        p1_index, error_message = self.parse_collection_point(
-            point_name=p1, group=p1group
-        )
+        p1_index, error_message = self.parse_collection_point(point_name=p1, group=p1group)
 
         if error_message:
-            await self.write_error_reply(
-                T2SAErrorCode.FailedPointGroupMeasurement, error_message
-            )
+            await self.write_error_reply(T2SAErrorCode.FailedPointGroupMeasurement, error_message)
             return
 
-        p2_index, error_message = self.parse_collection_point(
-            point_name=p2, group=p2group
-        )
+        p2_index, error_message = self.parse_collection_point(point_name=p2, group=p2group)
 
         if error_message:
-            await self.write_error_reply(
-                T2SAErrorCode.FailedPointGroupMeasurement, error_message
-            )
+            await self.write_error_reply(T2SAErrorCode.FailedPointGroupMeasurement, error_message)
             return
 
-        p1_position = self.position_current[p1group.lower()].get_one_fiducial_position(
-            p1_index
-        )
-        p2_position = self.position_current[p2group.lower()].get_one_fiducial_position(
-            p2_index
-        )
+        p1_position = self.position_current[p1group.lower()].get_one_fiducial_position(p1_index)
+        p2_position = self.position_current[p2group.lower()].get_one_fiducial_position(p2_index)
 
         await self.write_good_reply(
             f"Single Point Measurement {p2} result "
-            f"{p2_position.x-p1_position.x},"
-            f"{p2_position.y-p1_position.y},"
-            f"{p2_position.z-p1_position.z} "
+            f"{p2_position.x - p1_position.x},"
+            f"{p2_position.y - p1_position.y},"
+            f"{p2_position.z - p1_position.z} "
             f"{self._get_time_str()} False"
         )
 
@@ -601,11 +570,7 @@ class MockT2SA(tcpip.OneClientServer):
 
             index = int(collection_point["index"])
 
-            assert (
-                1
-                <= index
-                <= self.position_current[group.lower()].get_number_of_fiducial()
-            )
+            assert 1 <= index <= self.position_current[group.lower()].get_number_of_fiducial()
             return index - 1, ""
         except Exception as e:
             return 0, (
@@ -623,9 +588,7 @@ class MockT2SA(tcpip.OneClientServer):
         else:
             await self.write_good_reply(self.laser_status)
 
-    async def execute_measure_single_point(
-        self, collection: str, point_group: str, point_n: str
-    ) -> None:
+    async def execute_measure_single_point(self, collection: str, point_group: str, point_n: str) -> None:
         """Measure a single point.
 
         Parameters
@@ -648,15 +611,15 @@ class MockT2SA(tcpip.OneClientServer):
             return
 
         point_id = int(point_n.split("_")[-1]) - 1
-        point_position = self.position_current[
-            point_group.lower()
-        ].get_one_fiducial_position(fiducial=point_id)
+        point_position = self.position_current[point_group.lower()].get_one_fiducial_position(
+            fiducial=point_id
+        )
 
         await self.write_good_reply(
             f"Single Point Measurement {point_n} result "
-            f"{point_position.x*1e3:.6f},"
-            f"{point_position.y*1e3:.6f},"
-            f"{point_position.z*1e3:.6f} "
+            f"{point_position.x * 1e3:.6f},"
+            f"{point_position.y * 1e3:.6f},"
+            f"{point_position.z * 1e3:.6f} "
             f"{self._get_time_str()} True"
         )
 
@@ -697,9 +660,7 @@ class MockT2SA(tcpip.OneClientServer):
         if filename.startswith("C:"):
             await self.write_good_reply(T2SA_REPLY_READY)
         else:
-            await self.write_error_reply(
-                T2SAErrorCode.SaveSAJobFileFailed, "Save SA job file failed."
-            )
+            await self.write_error_reply(T2SAErrorCode.SaveSAJobFileFailed, "Save SA job file failed.")
 
     async def execute_set_reference_group(self, reference_group: str) -> None:
         """Set the reference point group.
@@ -732,9 +693,7 @@ class MockT2SA(tcpip.OneClientServer):
         """
 
         if working_frame not in self.valid_working_frame:
-            await self.write_error_reply(
-                T2SAErrorCode.WorkingFrameNotFound, "POS: NotFound"
-            )
+            await self.write_error_reply(T2SAErrorCode.WorkingFrameNotFound, "POS: NotFound")
         else:
             self.working_frame = working_frame
             await self.write_good_reply(T2SA_REPLY_READY)
@@ -756,9 +715,7 @@ class MockT2SA(tcpip.OneClientServer):
         elif value == "1":
             await self.power_on()
         else:
-            await self.write_error_reply(
-                T2SAErrorCode.CommandRejected, f"Invalid input argument: {value}."
-            )
+            await self.write_error_reply(T2SAErrorCode.CommandRejected, f"Invalid input argument: {value}.")
 
     async def power_off(self) -> None:
         """Set power off."""
@@ -815,24 +772,16 @@ class MockT2SA(tcpip.OneClientServer):
                 command_bytes = await self.readline()
                 self.log.debug(f"Mock T2SA received command: {command_bytes}")
                 if not command_bytes:
-                    self.log.info(
-                        "read loop ending; null data read indicates client hung up"
-                    )
+                    self.log.info("read loop ending; null data read indicates client hung up")
                     break
 
                 command = command_bytes.decode().strip()
                 if not command:
                     continue
 
-                self._commands_reply_tasks.append(
-                    asyncio.create_task(self._handle_comand(command))
-                )
+                self._commands_reply_tasks.append(asyncio.create_task(self._handle_comand(command)))
 
-                done_tasks_index = [
-                    i
-                    for i, task in enumerate(self._commands_reply_tasks)
-                    if task.done()
-                ]
+                done_tasks_index = [i for i, task in enumerate(self._commands_reply_tasks) if task.done()]
 
                 for index in done_tasks_index:
                     await self._commands_reply_tasks.pop(index)
@@ -889,27 +838,12 @@ class MockT2SA(tcpip.OneClientServer):
         position_optimum_reference = self.position_optimum[reference_group]
         position_optimum_point_group = self.position_optimum[point_group]
 
-        origin_x = (
-            position_optimum_point_group.origin.x - position_optimum_reference.origin.x
-        )
-        origin_y = (
-            position_optimum_point_group.origin.y - position_optimum_reference.origin.y
-        )
-        origin_z = (
-            position_optimum_point_group.origin.z - position_optimum_reference.origin.z
-        )
-        origin_u = (
-            position_optimum_point_group.rotation.u
-            - position_optimum_reference.rotation.u
-        )
-        origin_v = (
-            position_optimum_point_group.rotation.v
-            - position_optimum_reference.rotation.v
-        )
-        origin_w = (
-            position_optimum_point_group.rotation.w
-            - position_optimum_reference.rotation.w
-        )
+        origin_x = position_optimum_point_group.origin.x - position_optimum_reference.origin.x
+        origin_y = position_optimum_point_group.origin.y - position_optimum_reference.origin.y
+        origin_z = position_optimum_point_group.origin.z - position_optimum_reference.origin.z
+        origin_u = position_optimum_point_group.rotation.u - position_optimum_reference.rotation.u
+        origin_v = position_optimum_point_group.rotation.v - position_optimum_reference.rotation.v
+        origin_w = position_optimum_point_group.rotation.w - position_optimum_reference.rotation.w
 
         position_reference = self.position_current[reference_group]
         position_point_group = self.position_current[point_group]
@@ -923,12 +857,12 @@ class MockT2SA(tcpip.OneClientServer):
 
         await self.write_good_reply(
             f"Object Offset Report Frame{point_group.upper()}_{self._get_measurement_id()};"
-            f"X:{dx-origin_x};"
-            f"Y:{dy-origin_y};"
-            f"Z:{dz-origin_z};"
-            f"Rx:{du-origin_u};"
-            f"Ry:{dv-origin_v};"
-            f"Rz:{dw-origin_w};"
+            f"X:{dx - origin_x};"
+            f"Y:{dy - origin_y};"
+            f"Z:{dz - origin_z};"
+            f"Rx:{du - origin_u};"
+            f"Ry:{dv - origin_v};"
+            f"Rz:{dw - origin_w};"
             f"{self._get_time_str()}"
         )
 
@@ -955,9 +889,7 @@ class MockT2SA(tcpip.OneClientServer):
 
     def _get_time_str(self) -> str:
         """Return the current time with the appropriate format."""
-        return utils.astropy_time_from_tai_unix(utils.current_tai()).strftime(
-            "%m/%d/%Y %H:%M:%S"
-        )
+        return utils.astropy_time_from_tai_unix(utils.current_tai()).strftime("%m/%d/%Y %H:%M:%S")
 
     def _get_measurement_id(self) -> str:
         """Return the measument id.
@@ -1025,19 +957,13 @@ class MockT2SA(tcpip.OneClientServer):
             Dictionary with keywords arguments to pass to ``command_handler``.
         """
         command_name, _, args_str = (
-            command.partition(" ")
-            if command.startswith("?POS")
-            else command.partition(":")
+            command.partition(" ") if command.startswith("?POS") else command.partition(":")
         )
         command_handler, args_regex = self.dispatchers.get(command_name, (None, None))
 
         if args_regex is not None:
             command_args_match = args_regex.match(args_str)
-            command_kwargs = (
-                command_args_match.groupdict()
-                if command_args_match is not None
-                else dict()
-            )
+            command_kwargs = command_args_match.groupdict() if command_args_match is not None else dict()
         else:
             canned_reply = self.canned_replies.get(command)
             if canned_reply is not None:

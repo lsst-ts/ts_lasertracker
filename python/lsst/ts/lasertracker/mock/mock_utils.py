@@ -85,37 +85,27 @@ def get_random_initial_position() -> dict[str, MockT2SAPointGroup]:
             radius=4.20,
         ),
         m2=MockT2SAPointGroup(
-            origin=CartesianCoordinate(
-                *(np.array([0.0, 0.0, 3.0]) + np.random.normal(0.0, 1e-3, 3))
-            ),
+            origin=CartesianCoordinate(*(np.array([0.0, 0.0, 3.0]) + np.random.normal(0.0, 1e-3, 3))),
             rotation=BodyRotation(*np.random.normal(0.0, 6e-3, 3)),
             radius=1.74,
         ),
         cam=MockT2SAPointGroup(
-            origin=CartesianCoordinate(
-                *(np.array([0.0, 0.0, 2.0]) + np.random.normal(0.0, 1e-3, 3))
-            ),
+            origin=CartesianCoordinate(*(np.array([0.0, 0.0, 2.0]) + np.random.normal(0.0, 1e-3, 3))),
             rotation=BodyRotation(*np.random.normal(0.0, 6e-3, 3)),
             radius=0.85,
         ),
         cam_rot=MockT2SAPointGroup(
-            origin=CartesianCoordinate(
-                *(np.array([0.0, 0.0, 2.0]) + np.random.normal(0.0, 1e-3, 3))
-            ),
+            origin=CartesianCoordinate(*(np.array([0.0, 0.0, 2.0]) + np.random.normal(0.0, 1e-3, 3))),
             rotation=BodyRotation(*np.random.normal(0.0, 6e-3, 3)),
             radius=0.85,
         ),
         tma_central=MockT2SAPointGroup(
-            origin=CartesianCoordinate(
-                *(np.array([0.0, 0.0, 0.5]) + np.random.normal(0.0, 1e-3, 3))
-            ),
+            origin=CartesianCoordinate(*(np.array([0.0, 0.0, 0.5]) + np.random.normal(0.0, 1e-3, 3))),
             rotation=BodyRotation(*np.random.normal(0.0, 6e-3, 3)),
             radius=4.20,
         ),
         tma_upper=MockT2SAPointGroup(
-            origin=CartesianCoordinate(
-                *(np.array([0.0, 0.0, 3.5]) + np.random.normal(0.0, 1e-3, 3))
-            ),
+            origin=CartesianCoordinate(*(np.array([0.0, 0.0, 3.5]) + np.random.normal(0.0, 1e-3, 3))),
             rotation=BodyRotation(*np.random.normal(0.0, 6e-3, 3)),
             radius=4.20,
         ),

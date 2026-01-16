@@ -28,10 +28,9 @@ import traceback
 import types
 import typing
 
-from lsst.ts import salobj
-from lsst.ts import utils
-from lsst.ts.xml.enums.LaserTracker import LaserStatus, SalIndex, T2SAStatus
+from lsst.ts import salobj, utils
 from lsst.ts.xml import sal_enums
+from lsst.ts.xml.enums.LaserTracker import LaserStatus, SalIndex, T2SAStatus
 
 from . import __version__
 from .config_schema import CONFIG_SCHEMA
@@ -181,16 +180,12 @@ class LaserTrackerCsc(salobj.ConfigurableCsc):
                 self.group_idx = 1
                 await self.model.set_measured_index(idx=self.group_idx)
             except Exception:
-                error_message = (
-                    "Failed to connect to T2SA. "
-                    f"Ensure it is running in {t2sa_host}."
-                )
+                error_message = f"Failed to connect to T2SA. Ensure it is running in {t2sa_host}."
 
                 self.log.exception(error_message)
                 raise RuntimeError(error_message)
             self.log.debug(
-                f"Connected to t2sa at {self.model.host}:{self.model.port}. "
-                "Setting telescope position."
+                f"Connected to t2sa at {self.model.host}:{self.model.port}. Setting telescope position."
             )
         elif self.model is not None:
             if self.model.connected:
@@ -213,9 +208,7 @@ class LaserTrackerCsc(salobj.ConfigurableCsc):
 
             if self.telemetry_loop_task.done():
                 self._run_telemetry_loop = True
-                self.telemetry_loop_task = asyncio.create_task(
-                    self.run_telemetry_loop()
-                )
+                self.telemetry_loop_task = asyncio.create_task(self.run_telemetry_loop())
         else:
             await self.stop_telemetry_loop()
 
@@ -249,20 +242,14 @@ class LaserTrackerCsc(salobj.ConfigurableCsc):
             if instance_dict["sal_index"] == self.salinfo.index
         ]
         if len(instance_dicts) > 1:
-            raise salobj.ExpectedError(
-                f"Duplicate config entries found for sal_index={self.salinfo.index}"
-            )
+            raise salobj.ExpectedError(f"Duplicate config entries found for sal_index={self.salinfo.index}")
         elif len(instance_dicts) == 0:
-            raise salobj.ExpectedError(
-                f"No config found for sal_index={self.salinfo.index}"
-            )
+            raise salobj.ExpectedError(f"No config found for sal_index={self.salinfo.index}")
 
         instance = types.SimpleNamespace(**instance_dicts[0])
         missing_targets = REQUIRED_TARGETS - set(instance.targets)
         if missing_targets:
-            raise RuntimeError(
-                f"config.targets is missing required targets {sorted(missing_targets)}"
-            )
+            raise RuntimeError(f"config.targets is missing required targets {sorted(missing_targets)}")
         self.config = instance
         self.log.info(f"Configuration: {self.config}")
 
@@ -282,9 +269,7 @@ class LaserTrackerCsc(salobj.ConfigurableCsc):
         self.assert_enabled()
         assert self.model is not None
         if data.target not in self.config.targets:
-            raise salobj.ExpectedError(
-                f"Unknown target {data.target}; must one of {self.config.targets}"
-            )
+            raise salobj.ExpectedError(f"Unknown target {data.target}; must one of {self.config.targets}")
 
         await self.cmd_measureTarget.ack_in_progress(
             data,
@@ -441,9 +426,7 @@ class LaserTrackerCsc(salobj.ConfigurableCsc):
         self.assert_enabled()
 
         # TODO (DM-36112): Remove powerOff command.
-        raise salobj.ExpectedError(
-            "Powering off the T2SA controller is unsupported from the CSC."
-        )
+        raise salobj.ExpectedError("Powering off the T2SA controller is unsupported from the CSC.")
 
     async def do_measurePoint(self, data: salobj.BaseDdsDataType) -> None:
         """Measure and return coords of a specific point.
@@ -456,9 +439,7 @@ class LaserTrackerCsc(salobj.ConfigurableCsc):
         self.assert_enabled()
         assert self.model is not None
 
-        measurement = await self.model.measure_single_point(
-            data.collection, data.pointgroup, data.target
-        )
+        measurement = await self.model.measure_single_point(data.collection, data.pointgroup, data.target)
 
         await self.evt_positionPublish.set_write(
             target=f"{data.target}",
@@ -627,9 +608,7 @@ class LaserTrackerCsc(salobj.ConfigurableCsc):
             await self.model.measure_target("M1M3")
         except T2SAError as e:
             if e.error_code == 305:
-                self.log.exception(
-                    f"T2SA reported error {e.error_code} while measuring target. Ignoring."
-                )
+                self.log.exception(f"T2SA reported error {e.error_code} while measuring target. Ignoring.")
             else:
                 raise
 
@@ -677,13 +656,9 @@ class LaserTrackerCsc(salobj.ConfigurableCsc):
         assert self.model is not None
 
         elevation_data, azimuth_data, rotator_data = await asyncio.gather(
-            self.mtmount_remote.tel_elevation.next(
-                flush=True, timeout=self.timeout_std
-            ),
+            self.mtmount_remote.tel_elevation.next(flush=True, timeout=self.timeout_std),
             self.mtmount_remote.tel_azimuth.next(flush=True, timeout=self.timeout_std),
-            self.mtrotator_remote.tel_rotation.next(
-                flush=True, timeout=self.timeout_std
-            ),
+            self.mtrotator_remote.tel_rotation.next(flush=True, timeout=self.timeout_std),
             return_exceptions=True,
         )
 
@@ -715,9 +690,7 @@ class LaserTrackerCsc(salobj.ConfigurableCsc):
                 isinstance(rotator_data, Exception),  # type: ignore
             ]
         ):
-            self.log.warning(
-                "Cannot determine one or more of the axis position. Using default value."
-            )
+            self.log.warning("Cannot determine one or more of the axis position. Using default value.")
 
         await self.model.set_telescope_position(
             telalt=self.elevation,
@@ -784,9 +757,7 @@ class LaserTrackerCsc(salobj.ConfigurableCsc):
                 f"Telemetry loop task still running. Waiting {wait_finish_interval}s for it to finish."
             )
             try:
-                await asyncio.wait_for(
-                    self.telemetry_loop_task, timeout=wait_finish_interval
-                )
+                await asyncio.wait_for(self.telemetry_loop_task, timeout=wait_finish_interval)
             except asyncio.TimeoutError:
                 # TimeoutError might happen if the tasks takes too long to
                 # finish. Will cancel it and move forward.

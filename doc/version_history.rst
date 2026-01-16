@@ -8,6 +8,15 @@ Version History
 
 .. towncrier release notes start
 
+v0.10.0 (2026-01-16)
+====================
+
+New Features
+------------
+
+- Adding LUT compensation in the target offsets. (`DM-53181 <https://rubinobs.atlassian.net//browse/DM-53181>`_)
+
+
 v0.9.4 (2025-08-20)
 ===================
 

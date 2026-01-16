@@ -82,9 +82,7 @@ class ModelTestCase(unittest.IsolatedAsyncioTestCase):
         assert "WARM" in response
 
         self.log.debug("Waiting for laser to finish warming up.")
-        await asyncio.wait_for(
-            self.mock_t2sa.laser_warmup_task, timeout=STANDARD_TIMEOUT
-        )
+        await asyncio.wait_for(self.mock_t2sa.laser_warmup_task, timeout=STANDARD_TIMEOUT)
 
         self.log.debug("Query laser status, should be LON.")
         response = await self.model.send_command("?LSTA")

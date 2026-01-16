@@ -27,8 +27,8 @@ import unittest
 
 import numpy as np
 import pytest
-from lsst.ts import lasertracker
-from lsst.ts import salobj
+
+from lsst.ts import lasertracker, salobj
 from lsst.ts.xml import sal_enums
 from lsst.ts.xml.enums.LaserTracker import SalIndex
 
@@ -121,9 +121,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 salobj.AckError,
                 match="T2SA not ready: Laser status LOFF. Should be 'LON'",
             ):
-                await self.remote.cmd_measureTarget.set_start(
-                    target="M1M3", timeout=STD_TIMEOUT
-                )
+                await self.remote.cmd_measureTarget.set_start(target="M1M3", timeout=STD_TIMEOUT)
 
     async def test_measure_target_while_warming(self) -> None:
         async with self.make_csc(
@@ -139,9 +137,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 salobj.AckError,
                 match="T2SA not ready: Laser status WARM. Should be 'LON'",
             ):
-                await self.remote.cmd_measureTarget.set_start(
-                    target="M1M3", timeout=STD_TIMEOUT
-                )
+                await self.remote.cmd_measureTarget.set_start(target="M1M3", timeout=STD_TIMEOUT)
 
             # Wait warmup to complete then try to measure again. This should
             # actually be an event from the CSC but we don't have it at this
@@ -150,9 +146,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
             self.remote.evt_positionPublish.flush()
 
-            await self.remote.cmd_measureTarget.set_start(
-                target="M1M3", timeout=STD_TIMEOUT
-            )
+            await self.remote.cmd_measureTarget.set_start(target="M1M3", timeout=STD_TIMEOUT)
 
             await self.assert_next_sample(
                 self.remote.evt_positionPublish,
@@ -178,9 +172,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
             self.remote.evt_positionPublish.flush()
 
-            await self.remote.cmd_measureTarget.set_start(
-                target="M1M3", timeout=STD_TIMEOUT
-            )
+            await self.remote.cmd_measureTarget.set_start(target="M1M3", timeout=STD_TIMEOUT)
 
             await self.assert_next_sample(
                 self.remote.evt_positionPublish,
@@ -336,9 +328,9 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 target="M1M3_1",
             )
 
-            assert np.sqrt(
-                position.dX**2.0 + position.dY**2.0 + position.dZ**2.0
-            ) * 1e-3 == pytest.approx(4.2, rel=1e-3)
+            assert np.sqrt(position.dX**2.0 + position.dY**2.0 + position.dZ**2.0) * 1e-3 == pytest.approx(
+                4.2, rel=1e-3
+            )
 
     async def test_point_delta(self) -> None:
         async with self.make_csc(
@@ -422,9 +414,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             self.csc.timeout_std = 0.1
 
             measure_task = asyncio.create_task(
-                self.remote.cmd_measureTarget.set_start(
-                    target="M1M3", timeout=STD_TIMEOUT
-                )
+                self.remote.cmd_measureTarget.set_start(target="M1M3", timeout=STD_TIMEOUT)
             )
 
             # Give it some time for the measure to start.
@@ -438,9 +428,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             # I am not really sure what should happen in this case. I need
             # to get more informatino from the controller to write this checks
             # I am going to assume the measument command should fail.
-            with pytest.raises(
-                salobj.AckError, match="Error executing measure plan for M1M3"
-            ):
+            with pytest.raises(salobj.AckError, match="Error executing measure plan for M1M3"):
                 await measure_task
 
     async def test_load_sa_template_file(self) -> None:
@@ -470,9 +458,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             simulation_mode=2,
         ):
             # Use wrong extension
-            with pytest.raises(
-                salobj.AckError, match="SA Template file not found or loaded."
-            ):
+            with pytest.raises(salobj.AckError, match="SA Template file not found or loaded."):
                 await self.remote.cmd_loadSATemplateFile.set_start(
                     file=(
                         r"C:\\Program Files (x86)\\New River "
@@ -493,9 +479,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 salobj.AckError,
                 match="T2SA not ready: Laser status LOFF. Should be 'LON'",
             ):
-                await self.remote.cmd_measureDrift.set_start(
-                    pointgroup="M2", timeout=STD_TIMEOUT
-                )
+                await self.remote.cmd_measureDrift.set_start(pointgroup="M2", timeout=STD_TIMEOUT)
 
     async def test_measure_drift(self) -> None:
         async with self.make_csc(
@@ -559,9 +543,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             config_dir=TEST_CONFIG_DIR,
             simulation_mode=2,
         ):
-            await self.remote.cmd_saveJobfile.set_start(
-                file=r"C:\Analyzer Data\TestJob", timeout=STD_TIMEOUT
-            )
+            await self.remote.cmd_saveJobfile.set_start(file=r"C:\Analyzer Data\TestJob", timeout=STD_TIMEOUT)
 
             # TODO: Add some checks
 

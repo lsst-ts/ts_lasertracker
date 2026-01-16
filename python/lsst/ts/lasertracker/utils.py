@@ -115,9 +115,7 @@ def parse_single_point_measurement(
     if measure_match is None:
         raise RuntimeError(f"Failed to parse measurement: {measurement}")
 
-    return CartesianCoordinate(
-        **dict([(k, float(v)) for k, v in measure_match.groupdict().items()])
-    )
+    return CartesianCoordinate(**dict([(k, float(v)) for k, v in measure_match.groupdict().items()]))
 
 
 def parse_offsets(

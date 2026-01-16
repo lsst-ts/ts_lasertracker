@@ -29,6 +29,7 @@ import types
 import typing
 
 from lsst.ts import salobj, utils
+from lsst.ts.mthexapod import base, compensation
 from lsst.ts.xml import sal_enums
 from lsst.ts.xml.enums.LaserTracker import LaserStatus, SalIndex, T2SAStatus
 
@@ -133,7 +134,7 @@ class LaserTrackerCsc(salobj.ConfigurableCsc):
             domain=self.domain,
             name="MTMount",
             readonly=True,
-            include=["elevation", "azimuth"],
+            include=["target", "elevation", "azimuth"],
         )
 
         self.mtrotator_remote = salobj.Remote(
@@ -586,8 +587,6 @@ class LaserTrackerCsc(salobj.ConfigurableCsc):
 
         await self.model.save_sa_jobfile(data.file)
 
-        # TODO (DM-36112): Publish something?
-
     async def measure_alignment(self, target: str) -> None:
         """Measure the offset between M1M3 optimum position and the target.
 
@@ -632,7 +631,7 @@ class LaserTrackerCsc(salobj.ConfigurableCsc):
             target=target_frame_name, reference_pointgroup=reference_frame_name
         )
 
-        # Remove Zeropoint from offset
+        # Remove Zeropoint from offset and add LUT
         if target == "M2":
             target_offset["dX"] -= self.config.zero_points["m2"]["x"]
             target_offset["dY"] -= self.config.zero_points["m2"]["y"]
@@ -645,6 +644,28 @@ class LaserTrackerCsc(salobj.ConfigurableCsc):
             target_offset["dZ"] -= self.config.zero_points["camera"]["z"]
             target_offset["dRX"] -= self.config.zero_points["camera"]["u"]
             target_offset["dRY"] -= self.config.zero_points["camera"]["v"]
+
+        # Add LUT for M2 or CAM targets
+        if target in ["M2", "CAM"]:
+            compensation_lut = compensation.Compensation(
+                elevation_rotation_coeffs=self.config.targets_lut_coeffs[target]["elevation_rotation_coeffs"],
+                azimuth_coeffs=self.config.targets_lut_coeffs[target]["azimuth_coeffs"],
+                temperature_coeffs=self.config.targets_lut_coeffs[target]["temperature_coeffs"],
+                min_temperature=self.config.min_temperature,
+                max_temperature=self.config.max_temperature,
+            )
+            compensation_inputs = base.CompensationInputs(
+                elevation=self.elevation,
+                azimuth=self.azimuth,
+                rotation=self.camrot,
+                temperature=0.0,
+            )
+            compensation_offsets = compensation_lut.get_offset(compensation_inputs)
+            target_offset["dX"] -= compensation_offsets.x * 1e-3
+            target_offset["dY"] -= compensation_offsets.y * 1e-3
+            target_offset["dZ"] -= compensation_offsets.z * 1e-3
+            target_offset["dRX"] -= compensation_offsets.u
+            target_offset["dRY"] -= compensation_offsets.v
 
         target_offset["force_output"] = True
         await self.evt_offsetsPublish.set_write(**target_offset)

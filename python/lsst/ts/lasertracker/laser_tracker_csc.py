@@ -134,14 +134,14 @@ class LaserTrackerCsc(salobj.ConfigurableCsc):
             domain=self.domain,
             name="MTMount",
             readonly=True,
-            include=["target", "elevation", "azimuth"],
+            include=["target", "elevation", "azimuth", "summaryState"],
         )
 
         self.mtrotator_remote = salobj.Remote(
             domain=self.domain,
             name="MTRotator",
             readonly=True,
-            include=["rotation"],
+            include=["rotation", "summaryState"],
         )
 
     async def begin_start(self, data: salobj.BaseDdsDataType) -> None:

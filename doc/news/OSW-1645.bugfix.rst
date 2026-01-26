@@ -1,0 +1,1 @@
+Included the summaryState event to the list of topics to read from the MTMount and MTRotator. This works around an issue with salobj that causes it to never finish starting the remotes if there are no events in the include list.

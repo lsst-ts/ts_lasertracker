@@ -8,6 +8,15 @@ Version History
 
 .. towncrier release notes start
 
+v0.10.1 (2026-01-26)
+====================
+
+Bug Fixes
+---------
+
+- Included the summaryState event to the list of topics to read from the MTMount and MTRotator. This works around an issue with salobj that causes it to never finish starting the remotes if there are no events in the include list. (`OSW-1645 <https://rubinobs.atlassian.net//browse/OSW-1645>`_)
+
+
 v0.10.0 (2026-01-16)
 ====================
 
